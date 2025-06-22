@@ -168,7 +168,11 @@ class GraphItPanel {
 		// Initialize components
 		this.codeAnalyzer = new Components.CodeAnalyzer();
 		this.repositoryAnalyzer = new Components.RepositoryAnalyzer();
-		this.flowchartGenerator = new Components.FlowchartGenerator(anthropicClient, config);
+		this.flowchartGenerator = new Components.FlowchartGenerator(
+			anthropicClient, 
+			config, 
+			(message) => this.panel.webview.postMessage(message)
+		);
 		this.webviewManager = new Components.WebviewManager(panel);
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
@@ -229,6 +233,11 @@ class GraphItPanel {
 					case 'checkApiStatus':
 						this.sendApiStatus();
 						break;
+					case 'openExternal':
+						if (message.data && message.data.url) {
+							vscode.env.openExternal(vscode.Uri.parse(message.data.url));
+						}
+						break;
 				}
 			},
 			null,
@@ -249,7 +258,11 @@ class GraphItPanel {
 
 	updateApiStatus() {
 		// Reinitialize components with new config
-		this.flowchartGenerator = new Components.FlowchartGenerator(anthropicClient, config);
+		this.flowchartGenerator = new Components.FlowchartGenerator(
+			anthropicClient, 
+			config, 
+			(message) => this.panel.webview.postMessage(message)
+		);
 		this.sendApiStatus();
 	}
 

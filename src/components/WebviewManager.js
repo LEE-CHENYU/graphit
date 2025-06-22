@@ -731,6 +731,104 @@ class WebviewManager {
 			align-items: center;
 			gap: var(--spacing-md);
 		}
+
+		/* =================================================================
+		   ERROR NOTIFICATION SYSTEM
+		   ================================================================= */
+		
+		.api-error-notification {
+			position: fixed;
+			top: 20px;
+			right: 20px;
+			background: var(--glass-overlay);
+			backdrop-filter: blur(12px);
+			border: 1px solid rgba(239, 68, 68, 0.4);
+			border-radius: var(--border-radius-medium);
+			padding: var(--spacing-lg);
+			max-width: 400px;
+			z-index: 1000;
+			box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+			transform: translateX(100%);
+			transition: transform var(--transition-slow);
+		}
+
+		.api-error-notification.show {
+			transform: translateX(0);
+		}
+
+		.api-error-notification.insufficient-credits {
+			border-color: rgba(251, 191, 36, 0.4);
+			background: rgba(251, 191, 36, 0.08);
+		}
+
+		.api-error-notification.rate-limit {
+			border-color: rgba(59, 130, 246, 0.4);
+			background: rgba(59, 130, 246, 0.08);
+		}
+
+		.api-error-notification.auth-error {
+			border-color: rgba(239, 68, 68, 0.4);
+			background: rgba(239, 68, 68, 0.08);
+		}
+
+		.error-notification-header {
+			display: flex;
+			align-items: center;
+			gap: var(--spacing-md);
+			margin-bottom: var(--spacing-sm);
+		}
+
+		.error-notification-icon {
+			font-size: 18px;
+		}
+
+		.error-notification-title {
+			font-weight: 600;
+			color: var(--text-primary);
+		}
+
+		.error-notification-close {
+			margin-left: auto;
+			background: none;
+			border: none;
+			color: var(--text-secondary);
+			cursor: pointer;
+			font-size: 16px;
+			padding: 2px;
+		}
+
+		.error-notification-body {
+			font-size: 12px;
+			color: var(--text-secondary);
+			line-height: 1.4;
+			margin-bottom: var(--spacing-md);
+		}
+
+		.error-notification-actions {
+			display: flex;
+			gap: var(--spacing-sm);
+		}
+
+		.error-notification-btn {
+			background: var(--glass-overlay);
+			border: 1px solid var(--glass-border);
+			color: var(--text-primary);
+			padding: 6px 10px;
+			border-radius: var(--border-radius-small);
+			cursor: pointer;
+			font-size: 11px;
+			transition: all var(--transition-normal);
+		}
+
+		.error-notification-btn:hover {
+			background: var(--glass-overlay-hover);
+		}
+
+		.error-notification-btn.primary {
+			background: var(--primary-accent);
+			border-color: var(--primary-accent);
+			color: white;
+		}
 	</style>
 </head>
 <body>
@@ -1157,6 +1255,127 @@ class WebviewManager {
 			}
 		}
 
+		function showApiErrorNotification(errorType, title, message, actions = []) {
+			// Remove any existing notifications
+			const existingNotification = document.querySelector('.api-error-notification');
+			if (existingNotification) {
+				existingNotification.remove();
+			}
+
+			// Create notification element
+			const notification = document.createElement('div');
+			notification.className = \`api-error-notification \${errorType}\`;
+
+			const iconMap = {
+				'insufficient-credits': '💳',
+				'rate-limit': '⏰',
+				'auth-error': '🔐',
+				'quota-exceeded': '📊',
+				'generic': '⚠️'
+			};
+
+			const icon = iconMap[errorType] || iconMap['generic'];
+
+			// Build actions HTML
+			let actionsHtml = '';
+			if (actions.length > 0) {
+				actionsHtml = '<div class="error-notification-actions">';
+				actions.forEach((action, index) => {
+					const isPrimary = index === 0 ? 'primary' : '';
+					actionsHtml += \`<button class="error-notification-btn \${isPrimary}" onclick="\${action.action}">\${action.label}</button>\`;
+				});
+				actionsHtml += '</div>';
+			}
+
+			notification.innerHTML = \`
+				<div class="error-notification-header">
+					<span class="error-notification-icon">\${icon}</span>
+					<span class="error-notification-title">\${title}</span>
+					<button class="error-notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+				</div>
+				<div class="error-notification-body">\${message}</div>
+				\${actionsHtml}
+			\`;
+
+			// Add to DOM and show
+			document.body.appendChild(notification);
+			setTimeout(() => notification.classList.add('show'), 100);
+
+			// Auto-hide after 10 seconds
+			setTimeout(() => {
+				if (notification.parentElement) {
+					notification.classList.remove('show');
+					setTimeout(() => notification.remove(), 300);
+				}
+			}, 10000);
+		}
+
+		function showInsufficientCreditsNotification() {
+			showApiErrorNotification(
+				'insufficient-credits',
+				'Insufficient API Credits',
+				'Your Anthropic account doesn\\'t have enough credits. GraphIt will use local generation instead.',
+				[
+					{ label: 'Add Credits', action: 'openAnthropicBilling()' },
+					{ label: 'Configure Key', action: 'configureApiKey()' }
+				]
+			);
+		}
+
+		function showRateLimitNotification() {
+			showApiErrorNotification(
+				'rate-limit',
+				'Rate Limit Exceeded',
+				'You\\'ve hit the API rate limit. This is temporary - GraphIt will use local generation for now.',
+				[
+					{ label: 'Check Usage', action: 'openAnthropicUsage()' },
+					{ label: 'Continue Local', action: 'acknowledgeLocalGeneration()' }
+				]
+			);
+		}
+
+		function showAuthErrorNotification() {
+			showApiErrorNotification(
+				'auth-error',
+				'Authentication Failed',
+				'Your API key may be invalid or expired. GraphIt will use local generation instead.',
+				[
+					{ label: 'Reconfigure', action: 'configureApiKey()' },
+					{ label: 'Check Console', action: 'openAnthropicKeys()' }
+				]
+			);
+		}
+
+		function showQuotaExceededNotification() {
+			showApiErrorNotification(
+				'quota-exceeded',
+				'Monthly Quota Exceeded',
+				'You\\'ve reached your monthly usage quota. GraphIt will use local generation until reset.',
+				[
+					{ label: 'Upgrade Plan', action: 'openAnthropicBilling()' },
+					{ label: 'View Usage', action: 'openAnthropicUsage()' }
+				]
+			);
+		}
+
+		function openAnthropicBilling() {
+			vscode.postMessage({ command: 'openExternal', url: 'https://console.anthropic.com/account/billing' });
+		}
+
+		function openAnthropicUsage() {
+			vscode.postMessage({ command: 'openExternal', url: 'https://console.anthropic.com/account/usage' });
+		}
+
+		function openAnthropicKeys() {
+			vscode.postMessage({ command: 'openExternal', url: 'https://console.anthropic.com/account/keys' });
+		}
+
+		function acknowledgeLocalGeneration() {
+			const notification = document.querySelector('.api-error-notification');
+			if (notification) notification.remove();
+			updateStatus('Using local generation', 'completed');
+		}
+
 		function renderStats(stats, functionAnalysis = null) {
 			let statsHtml = '';
 			
@@ -1285,6 +1504,30 @@ class WebviewManager {
 							button.textContent = originalText;
 						}, 2000);
 					}
+					break;
+
+				case 'apiError':
+					const errorType = message.data.type;
+					switch (errorType) {
+						case 'insufficient-credits':
+							showInsufficientCreditsNotification();
+							break;
+						case 'rate-limit':
+							showRateLimitNotification();
+							break;
+						case 'auth-error':
+							showAuthErrorNotification();
+							break;
+						case 'quota-exceeded':
+							showQuotaExceededNotification();
+							break;
+						default:
+							showApiErrorNotification('generic', 'API Error', message.data.message || 'An error occurred with the Anthropic API');
+					}
+					break;
+
+				case 'openExternal':
+					// This is handled by extension.js but we define it here for completeness
 					break;
 			}
 		});

@@ -3,9 +3,10 @@
  * Focuses on logic flow, important functions, and clear layered architecture
  */
 class FlowchartGenerator {
-	constructor(anthropicClient, config) {
+	constructor(anthropicClient, config, webviewMessageCallback = null) {
 		this.anthropicClient = anthropicClient;
 		this.config = config;
+		this.webviewMessageCallback = webviewMessageCallback;
 	}
 
 	async generateUnifiedFlowchart(analysisData) {
@@ -44,6 +45,7 @@ class FlowchartGenerator {
 			
 		} catch (error) {
 			console.error('GraphIt: Claude API error:', error);
+			this.handleApiError(error, 'repository flowchart');
 			return this.generateLocalFlowchart(analysisData);
 		}
 	}
@@ -69,6 +71,7 @@ class FlowchartGenerator {
 			return this.generateLocalFunctionFlowchart(functionAnalysis);
 		} catch (error) {
 			console.error('GraphIt: Claude function flowchart generation failed:', error);
+			this.handleApiError(error, 'function flowchart');
 			return this.generateLocalFunctionFlowchart(functionAnalysis);
 		}
 	}
@@ -419,6 +422,252 @@ Generate ONLY the complete Mermaid flowchart code with gray styling.`;
 	async generateIncrementalMermaidCode(analysisData, updatePlan) {
 		// Simple fallback for incremental updates
 		return await this.generateLocalFlowchart(analysisData);
+	}
+
+	handleApiError(error, context = 'flowchart generation') {
+		const vscode = require('vscode');
+		
+		// Extract error details
+		const errorMessage = error.message || 'Unknown error';
+		const errorType = error.type || 'unknown';
+		const statusCode = error.status || error.statusCode;
+		
+		console.log(`GraphIt: API Error Details - Type: ${errorType}, Status: ${statusCode}, Message: ${errorMessage}`);
+
+		// Determine error type for both VS Code dialogs and webview notifications
+		let notificationType = 'generic';
+		
+		if (this.isInsufficientCreditError(error)) {
+			notificationType = 'insufficient-credits';
+			this.showInsufficientCreditDialog();
+		} else if (this.isRateLimitError(error)) {
+			notificationType = 'rate-limit';
+			this.showRateLimitDialog();
+		} else if (this.isAuthenticationError(error)) {
+			notificationType = 'auth-error';
+			this.showAuthenticationErrorDialog();
+		} else if (this.isQuotaExceededError(error)) {
+			notificationType = 'quota-exceeded';
+			this.showQuotaExceededDialog();
+		} else {
+			this.showGenericApiErrorDialog(error, context);
+		}
+
+		// Also send notification to webview if panel is open
+		this.sendErrorToWebview(notificationType, errorMessage, context);
+	}
+
+	sendErrorToWebview(errorType, errorMessage, context) {
+		// Send error notification to webview if callback is available
+		if (this.webviewMessageCallback) {
+			this.webviewMessageCallback({
+				command: 'apiError',
+				data: {
+					type: errorType,
+					message: errorMessage,
+					context: context
+				}
+			});
+		}
+	}
+
+	isInsufficientCreditError(error) {
+		const errorMessage = (error.message || '').toLowerCase();
+		const errorType = (error.type || '').toLowerCase();
+		
+		return errorMessage.includes('insufficient') ||
+			   errorMessage.includes('credit') ||
+			   errorMessage.includes('billing') ||
+			   errorMessage.includes('payment') ||
+			   errorType.includes('billing') ||
+			   error.status === 402 ||
+			   error.statusCode === 402;
+	}
+
+	isRateLimitError(error) {
+		const errorMessage = (error.message || '').toLowerCase();
+		const errorType = (error.type || '').toLowerCase();
+		
+		return errorMessage.includes('rate limit') ||
+			   errorMessage.includes('too many requests') ||
+			   errorType.includes('rate_limit') ||
+			   error.status === 429 ||
+			   error.statusCode === 429;
+	}
+
+	isAuthenticationError(error) {
+		const errorMessage = (error.message || '').toLowerCase();
+		const errorType = (error.type || '').toLowerCase();
+		
+		return errorMessage.includes('unauthorized') ||
+			   errorMessage.includes('authentication') ||
+			   errorMessage.includes('invalid api key') ||
+			   errorType.includes('authentication') ||
+			   error.status === 401 ||
+			   error.statusCode === 401;
+	}
+
+	isQuotaExceededError(error) {
+		const errorMessage = (error.message || '').toLowerCase();
+		
+		return errorMessage.includes('quota') ||
+			   errorMessage.includes('limit exceeded') ||
+			   errorMessage.includes('usage limit');
+	}
+
+	showInsufficientCreditDialog() {
+		const vscode = require('vscode');
+		
+		const message = `💳 Insufficient Anthropic API Credits
+
+Your Anthropic account doesn't have enough credits to generate AI-powered flowcharts.
+
+🔄 GraphIt will automatically use local generation instead.
+
+💡 To continue using AI features:
+• Add credits to your Anthropic account at console.anthropic.com
+• Check your billing and usage limits
+• Consider upgrading your plan for higher limits`;
+
+		vscode.window.showWarningMessage(message, { modal: true }, 'Open Anthropic Console', 'Configure API Key', 'Continue Locally')
+		.then(selection => {
+			switch (selection) {
+				case 'Open Anthropic Console':
+					vscode.env.openExternal(vscode.Uri.parse('https://console.anthropic.com/account/billing'));
+					break;
+				case 'Configure API Key':
+					vscode.commands.executeCommand('graphit.configureApiKey');
+					break;
+				case 'Continue Locally':
+					vscode.window.showInformationMessage('GraphIt will use local generation. You can reconfigure your API key anytime.');
+					break;
+			}
+		});
+	}
+
+	showRateLimitDialog() {
+		const vscode = require('vscode');
+		
+		const message = `⏰ Anthropic API Rate Limit Exceeded
+
+You've hit the rate limit for API requests. This is temporary.
+
+🔄 GraphIt will use local generation for now.
+
+💡 What you can do:
+• Wait a few minutes before trying AI generation again
+• Upgrade your Anthropic plan for higher rate limits
+• Continue with local generation (works offline)`;
+
+		vscode.window.showWarningMessage(message, 'Retry in 5 Minutes', 'Continue Locally', 'Check Account')
+		.then(selection => {
+			switch (selection) {
+				case 'Retry in 5 Minutes':
+					setTimeout(() => {
+						vscode.window.showInformationMessage('You can now try AI-powered flowcharts again!');
+					}, 5 * 60 * 1000);
+					break;
+				case 'Continue Locally':
+					vscode.window.showInformationMessage('Using local generation. AI features will be available when rate limit resets.');
+					break;
+				case 'Check Account':
+					vscode.env.openExternal(vscode.Uri.parse('https://console.anthropic.com/account/usage'));
+					break;
+			}
+		});
+	}
+
+	showAuthenticationErrorDialog() {
+		const vscode = require('vscode');
+		
+		const message = `🔐 Anthropic API Authentication Failed
+
+Your API key may be invalid or expired.
+
+🔄 GraphIt will use local generation instead.
+
+💡 To fix this:
+• Check if your API key is correct
+• Verify your key hasn't expired
+• Reconfigure with a new API key`;
+
+		vscode.window.showErrorMessage(message, 'Reconfigure API Key', 'Continue Locally', 'Check Console')
+		.then(selection => {
+			switch (selection) {
+				case 'Reconfigure API Key':
+					vscode.commands.executeCommand('graphit.configureApiKey');
+					break;
+				case 'Continue Locally':
+					vscode.window.showInformationMessage('Using local generation. Reconfigure your API key when ready.');
+					break;
+				case 'Check Console':
+					vscode.env.openExternal(vscode.Uri.parse('https://console.anthropic.com/account/keys'));
+					break;
+			}
+		});
+	}
+
+	showQuotaExceededDialog() {
+		const vscode = require('vscode');
+		
+		const message = `📊 Anthropic API Quota Exceeded
+
+You've reached your monthly usage quota.
+
+🔄 GraphIt will use local generation instead.
+
+💡 Options:
+• Upgrade your Anthropic plan for higher quotas
+• Wait for quota reset next month
+• Continue with local generation (fully functional)`;
+
+		vscode.window.showWarningMessage(message, 'Upgrade Plan', 'Continue Locally', 'View Usage')
+		.then(selection => {
+			switch (selection) {
+				case 'Upgrade Plan':
+					vscode.env.openExternal(vscode.Uri.parse('https://console.anthropic.com/account/billing'));
+					break;
+				case 'Continue Locally':
+					vscode.window.showInformationMessage('Local generation works great! AI features return when quota resets.');
+					break;
+				case 'View Usage':
+					vscode.env.openExternal(vscode.Uri.parse('https://console.anthropic.com/account/usage'));
+					break;
+			}
+		});
+	}
+
+	showGenericApiErrorDialog(error, context) {
+		const vscode = require('vscode');
+		
+		const errorDetails = error.message || 'Unknown error occurred';
+		const message = `⚠️ Anthropic API Error
+
+Failed to generate AI-powered ${context}.
+
+Error: ${errorDetails}
+
+🔄 GraphIt will use local generation instead.
+
+💡 This might be a temporary issue:
+• Check your internet connection
+• Verify Anthropic service status
+• Try again in a few minutes`;
+
+		vscode.window.showWarningMessage(message, 'Retry', 'Continue Locally', 'Check Status')
+		.then(selection => {
+			switch (selection) {
+				case 'Retry':
+					vscode.window.showInformationMessage('Try generating the flowchart again to retry with AI.');
+					break;
+				case 'Continue Locally':
+					vscode.window.showInformationMessage('Using local generation. You can retry AI features anytime.');
+					break;
+				case 'Check Status':
+					vscode.env.openExternal(vscode.Uri.parse('https://status.anthropic.com/'));
+					break;
+			}
+		});
 	}
 }
 
