@@ -294,18 +294,18 @@ class FlowchartGenerator {
 
 	addProfessionalStyling() {
 		return `
-    %% Professional monotone styling
-    classDef default fill:#f5f5f5,stroke:#666,stroke-width:2px,color:#333,font-weight:500
-    classDef entryPoint fill:#e8e8e8,stroke:#444,stroke-width:3px,color:#000,font-weight:600
-    classDef process fill:#f0f0f0,stroke:#555,stroke-width:2px,color:#222,font-weight:500
-    classDef decision fill:#e0e0e0,stroke:#666,stroke-width:2px,color:#000,font-weight:500
-    classDef service fill:#ebebeb,stroke:#777,stroke-width:2px,color:#333,font-weight:500
-    classDef result fill:#ddd,stroke:#888,stroke-width:2px,color:#111,font-weight:500
-    classDef complete fill:#e8e8e8,stroke:#444,stroke-width:3px,color:#000,font-weight:600
+    %% Professional semitransparent gray styling for dark mode compatibility
+    classDef default fill:rgba(128,128,128,0.15),stroke:rgba(128,128,128,0.6),stroke-width:2px,color:rgba(255,255,255,0.9),font-weight:500
+    classDef entryPoint fill:rgba(128,128,128,0.2),stroke:rgba(128,128,128,0.8),stroke-width:3px,color:rgba(255,255,255,0.95),font-weight:600
+    classDef process fill:rgba(112,112,112,0.12),stroke:rgba(128,128,128,0.6),stroke-width:2px,color:rgba(255,255,255,0.9),font-weight:500
+    classDef decision fill:rgba(96,96,96,0.15),stroke:rgba(128,128,128,0.7),stroke-width:2px,color:rgba(255,255,255,0.9),font-weight:500
+    classDef service fill:rgba(120,120,120,0.12),stroke:rgba(128,128,128,0.6),stroke-width:2px,color:rgba(255,255,255,0.9),font-weight:500
+    classDef result fill:rgba(104,104,104,0.15),stroke:rgba(128,128,128,0.7),stroke-width:2px,color:rgba(255,255,255,0.9),font-weight:500
+    classDef complete fill:rgba(128,128,128,0.2),stroke:rgba(128,128,128,0.8),stroke-width:3px,color:rgba(255,255,255,0.95),font-weight:600
 
-    style A fill:#e8e8e8,stroke:#444,stroke-width:3px
-    style B fill:#f0f0f0,stroke:#555,stroke-width:2px
-    style C fill:#e0e0e0,stroke:#666,stroke-width:2px`;
+    style A fill:rgba(128,128,128,0.2),stroke:rgba(128,128,128,0.8),stroke-width:3px,color:rgba(255,255,255,0.95)
+    style B fill:rgba(112,112,112,0.12),stroke:rgba(128,128,128,0.6),stroke-width:2px,color:rgba(255,255,255,0.9)
+    style C fill:rgba(96,96,96,0.15),stroke:rgba(128,128,128,0.7),stroke-width:2px,color:rgba(255,255,255,0.9)`;
 	}
 
 	buildClaudePrompt(analysisData) {
