@@ -171,13 +171,15 @@ class GraphItPanel {
 		this.disposables = [];
 		this.refreshTimeout = null;
 		this.autoRefreshEnabled = true;
-		this.fileWatcher = null;
+		this.gitWatcher = null;
+		this.lastAnalysis = null;
+		this.changedFiles = new Set();
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 		this.panel.webview.html = this.getWebviewContent();
 		
-		// Setup file system watcher for auto-refresh
-		this.setupFileWatcher();
+		// Setup Git-based change tracking for auto-refresh
+		this.setupGitWatcher();
 		
 		this.panel.webview.onDidReceiveMessage(
 			async message => {
@@ -395,9 +397,41 @@ Use Mermaid syntax for the flowchart so it can be easily rendered. Focus on the 
 			return this.generateMermaidFlowchart(analysisData);
 		}
 
-		const { structure, stats } = analysisData;
+		const { structure, stats, isIncremental, changedFiles } = analysisData;
 		
-		const prompt = `You are an expert at creating beautiful, informative Mermaid flowcharts for software repositories. 
+		let prompt;
+		
+		if (isIncremental && changedFiles && changedFiles.length > 0) {
+			// Optimized prompt for incremental updates
+			prompt = `You are an expert at creating beautiful, informative Mermaid flowcharts for software repositories. 
+
+This is an INCREMENTAL UPDATE for a repository flowchart. Focus on efficiently updating the existing structure to reflect recent changes.
+
+Recent Changes (${changedFiles.length} files):
+${changedFiles.map(file => `- ${file}`).join('\n')}
+
+Current Repository Statistics:
+- Total Files: ${stats.totalFiles}
+- Total Directories: ${stats.totalDirectories}
+- Total Lines of Code: ${stats.totalLines}
+- File Types: ${JSON.stringify(stats.fileTypes, null, 2)}
+
+Repository Structure:
+${JSON.stringify(structure, null, 2)}
+
+Requirements for INCREMENTAL UPDATE:
+- Use 'graph TD' syntax for top-down flowchart
+- Focus on changes and their impact on architecture
+- Maintain existing structure but highlight new/modified components
+- Show relationships between changed files and existing architecture
+- Use descriptive node labels
+- Keep it efficient and focused on the changes
+- Add styling with classDef for visual appeal
+
+Return ONLY the Mermaid code, starting with 'graph TD' and including styling at the end.`;
+		} else {
+			// Full analysis prompt
+			prompt = `You are an expert at creating beautiful, informative Mermaid flowcharts for software repositories. 
 
 Please analyze this repository structure and create a comprehensive Mermaid flowchart that shows:
 1. The main architectural components and their relationships
@@ -426,6 +460,7 @@ Requirements:
 - Keep it readable and not overly complex
 
 Return ONLY the Mermaid code, starting with 'graph TD' and including styling at the end.`;
+		}
 
 		try {
 			console.log('GraphIt: Requesting flowchart from Claude...');
@@ -1082,7 +1117,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				const zoomDirection = e.deltaY > 0 ? -1 : 1;
 				const zoomFactor = 1 + (zoomDirection * zoomSensitivity * Math.abs(e.deltaY));
 				
-				currentZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 3.0);
+				currentZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 6.0);
 				applyTransform();
 			});
 			
@@ -1139,7 +1174,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					const currentDistance = getTouchDistance(e.touches);
 					const scaleFactor = currentDistance / initialTouchDistance;
 					
-					currentZoom = Math.min(Math.max(currentZoom * scaleFactor, 0.2), 3.0);
+					currentZoom = Math.min(Math.max(currentZoom * scaleFactor, 0.2), 6.0);
 					applyTransform();
 					
 					initialTouchDistance = currentDistance;
@@ -1386,8 +1421,15 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				case 'repositoryAnalyzed':
 					currentAnalysis = message.data;
 					
-					updateStatus('Generating flowchart...', 'generating');
-					updateLoadingText('Generating flowchart...', 'Creating visual representation...');
+					// Check if this is an incremental update
+					if (message.data.isIncremental) {
+						updateStatus(\`Incremental update: \${message.data.changedFiles.length} files changed\`, 'generating');
+						updateLoadingText('Smart update in progress...', 'Analyzing only changed files for efficiency...');
+						console.log('GraphIt: Incremental update - changed files:', message.data.changedFiles);
+					} else {
+						updateStatus('Generating flowchart...', 'generating');
+						updateLoadingText('Generating flowchart...', 'Creating visual representation...');
+					}
 					
 					renderStats(message.data.stats);
 					document.getElementById('structure').innerHTML = renderStructure(message.data.structure);
@@ -1422,13 +1464,27 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 </html>`;
 	}
 
-	setupFileWatcher() {
+	setupGitWatcher() {
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		if (!workspaceFolders) return;
 
-		// Watch for file changes in the workspace
-		const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+		// Get Git extension
+		const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+		if (!gitExtension) {
+			console.log('GraphIt: Git extension not found, falling back to file watcher');
+			this.setupFallbackWatcher();
+			return;
+		}
+
+		const git = gitExtension.getAPI(1);
+		const repository = git.repositories[0];
 		
+		if (!repository) {
+			console.log('GraphIt: No Git repository found, falling back to file watcher');
+			this.setupFallbackWatcher();
+			return;
+		}
+
 		const debouncedRefresh = () => {
 			// Only refresh if auto-refresh is enabled
 			if (!this.autoRefreshEnabled) return;
@@ -1438,10 +1494,51 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				clearTimeout(this.refreshTimeout);
 			}
 			
-			// Set new timeout - refresh after 3 seconds of inactivity
-			this.refreshTimeout = setTimeout(() => {
-				console.log('GraphIt: Auto-refreshing due to file changes...');
+			// Set new timeout - refresh after 2 seconds of inactivity
+			this.refreshTimeout = setTimeout(async () => {
+				console.log('GraphIt: Auto-refreshing due to Git changes...');
+				
+				// Get changed files from Git
+				const changes = repository.state.workingTreeChanges;
+				const stagedChanges = repository.state.indexChanges;
+				
+				this.changedFiles.clear();
+				[...changes, ...stagedChanges].forEach(change => {
+					this.changedFiles.add(change.uri.fsPath);
+				});
+				
+				console.log(`GraphIt: Detected ${this.changedFiles.size} changed files`);
+				
 				// Notify the webview that auto-refresh is happening
+				this.panel.webview.postMessage({
+					command: 'autoRefreshStarted'
+				});
+				
+				await this.handleIncrementalUpdate();
+			}, 2000);
+		};
+
+		// Listen to Git repository state changes
+		repository.state.onDidChange(debouncedRefresh, null, this.disposables);
+		
+		this.disposables.push(repository);
+		console.log('GraphIt: Git-based change tracking activated');
+		this.gitWatcher = repository;
+	}
+
+	setupFallbackWatcher() {
+		// Fallback to file system watcher if Git is not available
+		const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+		
+		const debouncedRefresh = () => {
+			if (!this.autoRefreshEnabled) return;
+			
+			if (this.refreshTimeout) {
+				clearTimeout(this.refreshTimeout);
+			}
+			
+			this.refreshTimeout = setTimeout(() => {
+				console.log('GraphIt: Auto-refreshing due to file changes (fallback)...');
 				this.panel.webview.postMessage({
 					command: 'autoRefreshStarted'
 				});
@@ -1449,14 +1546,12 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			}, 3000);
 		};
 
-		// Listen to file creation, changes, and deletion
 		watcher.onDidCreate(debouncedRefresh);
 		watcher.onDidChange(debouncedRefresh);
 		watcher.onDidDelete(debouncedRefresh);
 
 		this.disposables.push(watcher);
-		console.log('GraphIt: File system watcher activated for auto-refresh');
-		this.fileWatcher = watcher;
+		console.log('GraphIt: File system watcher activated as fallback');
 	}
 
 	toggleAutoRefresh(enabled) {
@@ -1466,6 +1561,59 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		if (!enabled && this.refreshTimeout) {
 			clearTimeout(this.refreshTimeout);
 			this.refreshTimeout = null;
+		}
+	}
+
+	async handleIncrementalUpdate() {
+		try {
+			if (this.changedFiles.size === 0) {
+				// No specific changes, do full refresh
+				await this.handleAnalyzeRepository();
+				return;
+			}
+
+			console.log('GraphIt: Performing incremental update for changed files');
+			
+			// Analyze only changed files for efficiency
+			const workspaceFolders = vscode.workspace.workspaceFolders;
+			if (!workspaceFolders) return;
+
+			const workspaceRoot = workspaceFolders[0].uri.fsPath;
+			const analyzer = new RepositoryAnalyzer(workspaceRoot);
+			
+			// Get current analysis
+			const currentAnalysis = await analyzer.analyzeRepository();
+			
+			// Check if changes are significant enough to regenerate
+			const significantChanges = Array.from(this.changedFiles).some(filePath => {
+				const relativePath = path.relative(workspaceRoot, filePath);
+				return !analyzer.shouldIgnore(path.basename(filePath)) && 
+					   (relativePath.includes('.js') || relativePath.includes('.ts') || 
+						relativePath.includes('.py') || relativePath.includes('.json') ||
+						relativePath.includes('.md') || relativePath.includes('.yml'));
+			});
+
+			if (significantChanges) {
+				console.log('GraphIt: Significant changes detected, regenerating flowchart');
+				
+				this.panel.webview.postMessage({
+					command: 'repositoryAnalyzed',
+					data: {
+						...currentAnalysis,
+						hasClaudeApi: !!anthropicClient && !!config?.flowchart?.enableClaudeGeneration,
+						isIncremental: true,
+						changedFiles: Array.from(this.changedFiles)
+					}
+				});
+				
+				this.lastAnalysis = currentAnalysis;
+			} else {
+				console.log('GraphIt: No significant changes, skipping regeneration');
+			}
+		} catch (error) {
+			console.error('GraphIt: Error in incremental update:', error);
+			// Fallback to full refresh on error
+			await this.handleAnalyzeRepository();
 		}
 	}
 
