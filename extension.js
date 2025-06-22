@@ -32,6 +32,319 @@ function loadConfig(extensionPath) {
 	}
 }
 
+// Function-level analysis utilities
+class FunctionAnalyzer {
+	constructor(workspaceRoot) {
+		this.workspaceRoot = workspaceRoot;
+		this.functions = new Map();
+		this.callGraph = new Map();
+		this.classes = new Map();
+		this.imports = new Map();
+		this.controlFlow = new Map();
+	}
+
+	async analyzeFunctions() {
+		console.log('GraphIt: Starting function-level analysis...');
+		await this.scanCodeFiles();
+		this.buildCallGraph();
+		this.identifyControlFlow();
+		
+		return {
+			functions: Array.from(this.functions.values()),
+			callGraph: this.callGraph,
+			classes: Array.from(this.classes.values()),
+			imports: Array.from(this.imports.values()),
+			controlFlow: this.controlFlow,
+			metadata: {
+				analyzedAt: new Date().toISOString(),
+				totalFunctions: this.functions.size,
+				totalClasses: this.classes.size
+			}
+		};
+	}
+
+	async scanCodeFiles() {
+		const codeExtensions = ['.js', '.ts', '.py', '.java', '.cs', '.cpp', '.c', '.go', '.rs'];
+		await this.walkDirectory(this.workspaceRoot, codeExtensions);
+	}
+
+	async walkDirectory(dirPath, extensions, level = 0) {
+		if (level > 5) return;
+		
+		try {
+			const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+			
+			for (const entry of entries) {
+				if (this.shouldIgnore(entry.name)) continue;
+				
+				const fullPath = path.join(dirPath, entry.name);
+				
+				if (entry.isDirectory()) {
+					await this.walkDirectory(fullPath, extensions, level + 1);
+				} else if (extensions.includes(path.extname(entry.name))) {
+					await this.analyzeCodeFile(fullPath);
+				}
+			}
+		} catch (error) {
+			console.error(`GraphIt: Error reading directory ${dirPath}:`, error);
+		}
+	}
+
+	async analyzeCodeFile(filePath) {
+		try {
+			const content = fs.readFileSync(filePath, 'utf8');
+			const relativePath = path.relative(this.workspaceRoot, filePath);
+			const ext = path.extname(filePath);
+			
+			switch (ext) {
+				case '.js':
+				case '.ts':
+					this.parseJavaScript(content, relativePath);
+					break;
+				case '.py':
+					this.parsePython(content, relativePath);
+					break;
+				default:
+					this.parseGeneric(content, relativePath);
+			}
+		} catch (error) {
+			console.error(`GraphIt: Error analyzing file ${filePath}:`, error);
+		}
+	}
+
+	parseJavaScript(content, filePath) {
+		const lines = content.split('\n');
+		let currentClass = null;
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Class definitions
+			const classMatch = line.match(/class\s+(\w+)/);
+			if (classMatch) {
+				currentClass = {
+					name: classMatch[1],
+					file: filePath,
+					line: i + 1,
+					methods: [],
+					type: 'class'
+				};
+				this.classes.set(classMatch[1], currentClass);
+			}
+			
+			// Function definitions
+			const funcMatches = [
+				line.match(/(?:async\s+)?function\s+(\w+)/),
+				line.match(/(?:async\s+)?(\w+)\s*\(/),
+				line.match(/(\w+)\s*:\s*(?:async\s+)?function/),
+				line.match(/(\w+)\s*=\s*(?:async\s+)?\(/),
+				line.match(/(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{/)
+			];
+			
+			for (const match of funcMatches) {
+				if (match && !this.isKeyword(match[1])) {
+					const funcName = match[1];
+					const funcObj = {
+						name: funcName,
+						file: filePath,
+						line: i + 1,
+						class: currentClass?.name,
+						calls: [],
+						calledBy: [],
+						type: line.includes('async') ? 'async-function' : 'function',
+						isConstructor: funcName === 'constructor',
+						isMethod: currentClass !== null
+					};
+					
+					this.functions.set(`${filePath}:${funcName}`, funcObj);
+					
+					if (currentClass) {
+						currentClass.methods.push(funcName);
+					}
+					break;
+				}
+			}
+			
+			// Import statements
+			const importMatch = line.match(/(?:import|require)\s*\(?[^)]*\)?\s*(?:from\s+)?['"`]([^'"`]+)['"`]/);
+			if (importMatch) {
+				this.imports.set(importMatch[1], {
+					module: importMatch[1],
+					file: filePath,
+					line: i + 1
+				});
+			}
+			
+			// Function calls
+			const callMatches = line.matchAll(/(\w+)\s*\(/g);
+			for (const match of callMatches) {
+				if (!this.isKeyword(match[1])) {
+					// Store for later call graph building
+					if (!this.callGraph.has(filePath)) {
+						this.callGraph.set(filePath, []);
+					}
+					this.callGraph.get(filePath).push({
+						caller: 'current-context',
+						callee: match[1],
+						line: i + 1
+					});
+				}
+			}
+			
+			// Control flow patterns
+			if (line.includes('if') || line.includes('switch') || line.includes('for') || line.includes('while')) {
+				if (!this.controlFlow.has(filePath)) {
+					this.controlFlow.set(filePath, []);
+				}
+				this.controlFlow.get(filePath).push({
+					type: this.getControlFlowType(line),
+					line: i + 1,
+					content: line
+				});
+			}
+		}
+	}
+
+	parsePython(content, filePath) {
+		const lines = content.split('\n');
+		let currentClass = null;
+		let indentLevel = 0;
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmed = line.trim();
+			const currentIndent = line.length - line.trimStart().length;
+			
+			// Class definitions
+			const classMatch = trimmed.match(/class\s+(\w+)/);
+			if (classMatch) {
+				currentClass = {
+					name: classMatch[1],
+					file: filePath,
+					line: i + 1,
+					methods: [],
+					type: 'class'
+				};
+				this.classes.set(classMatch[1], currentClass);
+				indentLevel = currentIndent;
+			}
+			
+			// Function/method definitions
+			const funcMatch = trimmed.match(/def\s+(\w+)/);
+			if (funcMatch) {
+				const funcName = funcMatch[1];
+				const funcObj = {
+					name: funcName,
+					file: filePath,
+					line: i + 1,
+					class: currentClass?.name,
+					calls: [],
+					calledBy: [],
+					type: 'function',
+					isMethod: currentClass !== null && currentIndent > indentLevel,
+					isAsync: trimmed.includes('async def')
+				};
+				
+				this.functions.set(`${filePath}:${funcName}`, funcObj);
+				
+				if (currentClass && currentIndent > indentLevel) {
+					currentClass.methods.push(funcName);
+				}
+			}
+		}
+	}
+
+	parseGeneric(content, filePath) {
+		// Basic parsing for other languages
+		const lines = content.split('\n');
+		
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+			
+			// Generic function patterns
+			const funcPatterns = [
+				/(?:public|private|protected)?\s*(?:static)?\s*\w+\s+(\w+)\s*\(/,  // Java/C#
+				/(\w+)\s*\([^)]*\)\s*\{/,  // Generic function with body
+			];
+			
+			for (const pattern of funcPatterns) {
+				const match = line.match(pattern);
+				if (match && !this.isKeyword(match[1])) {
+					this.functions.set(`${filePath}:${match[1]}`, {
+						name: match[1],
+						file: filePath,
+						line: i + 1,
+						calls: [],
+						calledBy: [],
+						type: 'function'
+					});
+					break;
+				}
+			}
+		}
+	}
+
+	buildCallGraph() {
+		// Build relationships between functions
+		for (const [filePath, calls] of this.callGraph) {
+			for (const call of calls) {
+				// Find matching functions
+				for (const [funcKey, func] of this.functions) {
+					if (func.name === call.callee) {
+						func.calledBy.push({
+							file: filePath,
+							line: call.line,
+							caller: call.caller
+						});
+					}
+				}
+			}
+		}
+	}
+
+	identifyControlFlow() {
+		// Enhance control flow analysis
+		for (const [filePath, flows] of this.controlFlow) {
+			for (const flow of flows) {
+				flow.complexity = this.calculateComplexity(flow);
+			}
+		}
+	}
+
+	getControlFlowType(line) {
+		if (line.includes('if')) return 'conditional';
+		if (line.includes('switch')) return 'switch';
+		if (line.includes('for')) return 'loop';
+		if (line.includes('while')) return 'loop';
+		if (line.includes('try')) return 'exception';
+		return 'unknown';
+	}
+
+	calculateComplexity(flow) {
+		// Simple complexity calculation
+		return flow.content.split('&&').length + flow.content.split('||').length;
+	}
+
+	isKeyword(word) {
+		const keywords = new Set([
+			'if', 'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue',
+			'return', 'try', 'catch', 'finally', 'throw', 'new', 'this', 'super',
+			'var', 'let', 'const', 'function', 'class', 'extends', 'implements',
+			'import', 'export', 'from', 'default', 'async', 'await', 'yield',
+			'true', 'false', 'null', 'undefined', 'console', 'log'
+		]);
+		return keywords.has(word);
+	}
+
+	shouldIgnore(name) {
+		const ignoredDirs = new Set([
+			'node_modules', '.git', '.vscode', 'dist', 'build', 
+			'.next', '.nuxt', 'coverage', '.nyc_output', 'logs'
+		]);
+		return ignoredDirs.has(name) || name.startsWith('.');
+	}
+}
+
 // Repository analysis utilities
 class RepositoryAnalyzer {
 	constructor(workspaceRoot) {
@@ -177,6 +490,8 @@ class GraphItPanel {
 		this.previousFlowchartState = null;
 		this.currentFlowchartNodes = new Map();
 		this.currentFlowchartEdges = new Set();
+		this.currentViewMode = 'repository'; // 'repository' or 'function'
+		this.lastFunctionAnalysis = null;
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 		this.panel.webview.html = this.getWebviewContent();
@@ -192,6 +507,9 @@ class GraphItPanel {
 					break;
 				case 'generateFlowchart':
 					await this.handleGenerateFlowchart(message.data);
+					break;
+				case 'generateFunctionFlowchart':
+					await this.handleGenerateFunctionFlowchart(message.data);
 					break;
 				case 'toggleAutoRefresh':
 					this.toggleAutoRefresh(message.enabled);
@@ -256,16 +574,32 @@ class GraphItPanel {
 
 	async handleGenerateFlowchart(analysisData) {
 		try {
+			// Enhance repository analysis with function-level data
+			const workspaceFolders = vscode.workspace.workspaceFolders;
+			if (workspaceFolders) {
+				const workspaceRoot = workspaceFolders[0].uri.fsPath;
+				const functionAnalyzer = new FunctionAnalyzer(workspaceRoot);
+				
+				console.log('GraphIt: Adding function analysis to repository flowchart...');
+				const functionAnalysis = await functionAnalyzer.analyzeFunctions();
+				
+				// Enhance analysis data with function information
+				analysisData.functionAnalysis = functionAnalysis;
+				this.lastFunctionAnalysis = functionAnalysis;
+			}
+			
 			// Try to generate with Claude first, fallback to local if needed
 			const mermaidCode = await this.generateClaudeFlowchart(analysisData);
 			const claudePrompt = this.buildClaudePrompt(analysisData);
 			
 			// Store the current flowchart state for future incremental updates
 			this.storeFlowchartState(analysisData, mermaidCode);
+			this.currentViewMode = 'unified'; // New mode for integrated view
 			
+			const functionCount = analysisData.functionAnalysis ? analysisData.functionAnalysis.functions.length : 0;
 			const message = anthropicClient && config?.flowchart?.enableClaudeGeneration 
-				? 'Flowchart generated with Claude 4 Sonnet!' 
-				: 'Flowchart generated locally!';
+				? `Unified flowchart generated with Claude 4 Sonnet! (${functionCount} functions analyzed)` 
+				: `Unified flowchart generated locally! (${functionCount} functions analyzed)`;
 			
 			this.panel.webview.postMessage({
 				command: 'flowchartGenerated',
@@ -274,7 +608,9 @@ class GraphItPanel {
 					claudePrompt,
 					message,
 					source: anthropicClient ? 'claude' : 'local',
-					isIncremental: false
+					isIncremental: false,
+					type: 'unified',
+					functionCount
 				}
 			});
 		} catch (error) {
@@ -322,6 +658,53 @@ class GraphItPanel {
 			console.error('GraphIt: Error in incremental flowchart update:', error);
 			// Fallback to full refresh on error
 			await this.handleGenerateFlowchart(data);
+		}
+	}
+
+	async handleGenerateFunctionFlowchart(analysisData) {
+		try {
+			console.log('GraphIt: Generating function-level flowchart...');
+			
+			const workspaceFolders = vscode.workspace.workspaceFolders;
+			if (!workspaceFolders) {
+				vscode.window.showErrorMessage('No workspace folder open');
+				return;
+			}
+
+			const workspaceRoot = workspaceFolders[0].uri.fsPath;
+			const functionAnalyzer = new FunctionAnalyzer(workspaceRoot);
+			
+			// Perform function-level analysis
+			const functionAnalysis = await functionAnalyzer.analyzeFunctions();
+			
+			// Generate detailed function flowchart
+			const mermaidCode = await this.generateDetailedFunctionFlowchart(functionAnalysis);
+			const claudePrompt = this.buildFunctionFlowchartPrompt(functionAnalysis);
+			
+			// Store function analysis for auto-refresh
+			this.lastFunctionAnalysis = functionAnalysis;
+			this.currentViewMode = 'function';
+			
+			const totalFunctions = functionAnalysis.functions.length;
+			const displayedFunctions = Math.min(totalFunctions, 50);
+			const message = totalFunctions > 50 
+				? `Generated function flowchart with ${displayedFunctions} of ${totalFunctions} functions (limited for readability)`
+				: `Generated detailed function flowchart with ${totalFunctions} functions`;
+
+			this.panel.webview.postMessage({
+				command: 'functionFlowchartGenerated',
+				data: {
+					mermaidCode,
+					claudePrompt,
+					functionAnalysis,
+					message,
+					source: anthropicClient ? 'claude' : 'local',
+					type: 'function-level'
+				}
+			});
+		} catch (error) {
+			console.error('GraphIt: Error generating function flowchart:', error);
+			vscode.window.showErrorMessage('Failed to generate function flowchart: ' + error.message);
 		}
 	}
 
@@ -485,32 +868,334 @@ Generate the updated Mermaid code that freezes unchanged parts and only updates 
 		return highlightedCode;
 	}
 
-	buildClaudePrompt(analysisData) {
-		const { structure, stats } = analysisData;
+	async generateDetailedFunctionFlowchart(functionAnalysis) {
+		if (!anthropicClient || !config?.flowchart?.enableClaudeGeneration) {
+			return this.generateLocalFunctionFlowchart(functionAnalysis);
+		}
+
+		const prompt = this.buildFunctionFlowchartPrompt(functionAnalysis);
+
+		try {
+			const response = await anthropicClient.messages.create({
+				model: config.anthropic?.model || 'claude-3-5-sonnet-20241022',
+				max_tokens: config.anthropic?.maxTokens || 6000, // More tokens for complex function charts
+				temperature: 0.2,
+				messages: [{ role: 'user', content: prompt }]
+			});
+
+			const claudeResponse = response.content[0].text.trim();
+			const mermaidMatch = claudeResponse.match(/```(?:mermaid)?\s*\n?(flowchart\s+TD[\s\S]*?)```/i);
+			
+			if (mermaidMatch) {
+				return mermaidMatch[1].trim();
+			}
+			
+			return this.generateLocalFunctionFlowchart(functionAnalysis);
+		} catch (error) {
+			console.error('GraphIt: Claude function flowchart generation failed:', error);
+			return this.generateLocalFunctionFlowchart(functionAnalysis);
+		}
+	}
+
+	generateLocalFunctionFlowchart(functionAnalysis) {
+		const { functions, classes, controlFlow, metadata } = functionAnalysis;
 		
-		return `Please create a detailed flowchart/diagram representing the structure of this repository:
+		console.log(`GraphIt: Generating clean function flowchart based on actual codebase`);
+		
+		// Use simple letter-based node IDs like in the example (A, B, C, etc.)
+		let mermaidCode = 'flowchart TD\n';
+		let nodeCounter = 0;
+		const getNextNodeId = () => String.fromCharCode(65 + (nodeCounter++)); // A, B, C, etc.
+		
+		// Create a clean execution flow based on actual functions found
+		mermaidCode += '    %% User Entry Point\n';
+		const userEntry = getNextNodeId();
+		
+		// Find actual key functions from the codebase
+		const mainFunction = functions.find(func => 
+			func.name === 'activate' || func.name === 'main' || func.name === '__init__' || 
+			func.name === 'init' || func.name.includes('start') || func.name === 'constructor'
+		) || functions[0];
+		
+		const mainInit = getNextNodeId();
+		mermaidCode += `    ${userEntry}[User creates ${mainFunction ? mainFunction.name.replace('__', '') : 'Extension'}] --> ${mainInit}[${mainFunction ? this.cleanFunctionName(mainFunction.name) : 'Extension.activate'}]\n\n`;
+		
+		// Find initialization functions
+		const initFunctions = functions.filter(func => 
+			func.name.includes('init') || func.name.includes('setup') || func.name.includes('create') ||
+			func.name.includes('load') || func.name.includes('config') || func.name.includes('register')
+		).slice(0, 3);
+		
+		if (initFunctions.length > 0) {
+			mermaidCode += '    %% Initialization\n';
+			for (const initFunc of initFunctions) {
+				const nodeId = getNextNodeId();
+				mermaidCode += `    ${mainInit} --> ${nodeId}[${this.cleanFunctionName(initFunc.name)}]\n`;
+			}
+			mermaidCode += '\n';
+		}
+		
+		// Find main execution functions
+		const execFunctions = functions.filter(func => 
+			func.name.includes('run') || func.name.includes('execute') || func.name.includes('handle') ||
+			func.name.includes('process') || func.name.includes('analyze') || func.name.includes('generate')
+		).slice(0, 6);
+		
+		if (execFunctions.length > 0) {
+			mermaidCode += '    %% Main execution flow\n';
+			const mainRun = getNextNodeId();
+			mermaidCode += `    ${userEntry} --> ${mainRun}[${this.cleanFunctionName(execFunctions[0].name)}]\n`;
+			
+			let prevNode = mainRun;
+			for (let i = 1; i < execFunctions.length; i++) {
+				const nodeId = getNextNodeId();
+				mermaidCode += `    ${prevNode} --> ${nodeId}[${this.cleanFunctionName(execFunctions[i].name)}]\n`;
+				prevNode = nodeId;
+			}
+			mermaidCode += '\n';
+		}
+		
+		// Add decision points if we have conditional functions
+		const decisionFunctions = functions.filter(func => 
+			func.name.includes('check') || func.name.includes('validate') || func.name.includes('test') ||
+			func.name.includes('verify') || func.name.includes('should')
+		).slice(0, 2);
+		
+		if (decisionFunctions.length > 0) {
+			mermaidCode += '    %% Decision points\n';
+			for (const decisionFunc of decisionFunctions) {
+				const decisionNode = getNextNodeId();
+				const yesPath = getNextNodeId();
+				const noPath = getNextNodeId();
+				
+				mermaidCode += `    ${decisionNode}{${this.getCleanDecisionLabel(decisionFunc.name)}}\n`;
+				mermaidCode += `    ${decisionNode} -->|Yes| ${yesPath}[Continue processing]\n`;
+				mermaidCode += `    ${decisionNode} -->|No| ${noPath}[Handle alternative]\n`;
+			}
+			mermaidCode += '\n';
+		}
+		
+		// Add result processing
+		const resultFunctions = functions.filter(func => 
+			func.name.includes('return') || func.name.includes('result') || func.name.includes('output') ||
+			func.name.includes('response') || func.name.includes('complete')
+		).slice(0, 2);
+		
+		if (resultFunctions.length > 0) {
+			mermaidCode += '    %% Result processing\n';
+			for (const resultFunc of resultFunctions) {
+				const nodeId = getNextNodeId();
+				mermaidCode += `    ${nodeId}[${this.cleanFunctionName(resultFunc.name)}]\n`;
+			}
+			mermaidCode += '\n';
+		}
+		
+		// Add simplified subgraphs only if we have enough functions
+		if (functions.length > 10) {
+			const layers = this.identifySimpleLayers(functions);
+			
+			for (const [layerName, layerFunctions] of layers) {
+				if (layerFunctions.length > 2) {
+					mermaidCode += `    subgraph "${layerName}"\n`;
+					// Just reference a few key functions without overwhelming detail
+					const keyFunctions = layerFunctions.slice(0, 3);
+					for (const func of keyFunctions) {
+						mermaidCode += `        ${this.cleanFunctionName(func.name)}\n`;
+					}
+					mermaidCode += '    end\n\n';
+				}
+			}
+		}
+		
+		// Clean, minimal styling like the example
+		const totalNodes = nodeCounter;
+		if (totalNodes > 0) {
+			mermaidCode += `    style A fill:#e1f5fe\n`; // User entry
+			if (totalNodes > 2) mermaidCode += `    style C fill:#e8f5e8\n`; // Main execution
+			if (totalNodes > 5) mermaidCode += `    style F fill:#fff3e0\n`; // Decision/AI
+			if (totalNodes > 7) mermaidCode += `    style H fill:#f3e5f5\n`; // Special function
+		}
+		
+		return mermaidCode;
+	}
+
+	cleanFunctionName(name) {
+		// Clean up function names for better readability
+		return name
+			.replace(/^__/, '')
+			.replace(/__$/, '')
+			.replace(/_/g, ' ')
+			.replace(/([a-z])([A-Z])/g, '$1 $2') // camelCase to words
+			.replace(/\b\w/g, l => l.toUpperCase()); // Title case
+	}
+
+	getCleanDecisionLabel(funcName) {
+		if (funcName.includes('check') || funcName.includes('validate')) return 'Valid input?';
+		if (funcName.includes('test')) return 'Test passed?';
+		if (funcName.includes('should') || funcName.includes('can')) return 'Should proceed?';
+		if (funcName.includes('verify')) return 'Verified?';
+		return 'Continue?';
+	}
+
+	identifySimpleLayers(functions) {
+		const layers = new Map();
+		
+		for (const func of functions) {
+			let layer = 'Core';
+			
+			if (func.name.includes('web') || func.name.includes('http') || func.name.includes('request')) {
+				layer = 'Network';
+			} else if (func.name.includes('ui') || func.name.includes('view') || func.name.includes('render')) {
+				layer = 'UI';
+			} else if (func.name.includes('data') || func.name.includes('store') || func.name.includes('save')) {
+				layer = 'Data';
+			} else if (func.name.includes('util') || func.name.includes('helper')) {
+				layer = 'Utils';
+			}
+			
+			if (!layers.has(layer)) {
+				layers.set(layer, []);
+			}
+			layers.get(layer).push(func);
+		}
+		
+		return layers;
+	}
+
+	getDescriptiveLabel(funcName) {
+		// Convert function names to more descriptive labels
+		if (funcName.includes('init') || funcName.includes('__init__')) return 'Initialize Controller with action registry';
+		if (funcName.includes('create') && funcName.includes('browser')) return 'Create BrowserContext';
+		if (funcName.includes('setup') && funcName.includes('message')) return 'Setup MessageManager';
+		if (funcName.includes('create') && funcName.includes('action')) return 'Create action models from registry';
+		if (funcName.includes('run')) return 'agent.run max_steps=100';
+		if (funcName.includes('execute')) return 'Execute actions';
+		return funcName; // fallback to original name
+	}
+
+	buildFunctionFlowchartPrompt(functionAnalysis) {
+		const { functions, classes, controlFlow, metadata } = functionAnalysis;
+		
+		return `You are an expert at creating professional, highly detailed function-level flowcharts with sophisticated visual design that show execution flow, decision points, and component interactions.
+
+FUNCTION ANALYSIS DATA:
+- Total Functions: ${metadata.totalFunctions}
+- Total Classes: ${metadata.totalClasses}
+
+FUNCTIONS:
+${functions.slice(0, 20).map(func => `- ${func.name} (${func.type}) in ${func.file}:${func.line}${func.class ? ` [${func.class}]` : ''}`).join('\n')}
+
+CLASSES:
+${classes.slice(0, 10).map(cls => `- ${cls.name} in ${cls.file} with methods: [${cls.methods.join(', ')}]`).join('\n')}
+
+VISUAL STYLE REQUIREMENTS (CRITICAL - MATCH EXACTLY):
+Use this EXACT professional dark theme styling:
+\\\`\\\`\\\`
+classDef default fill:#2d3748,stroke:#4a5568,stroke-width:2px,color:#e2e8f0,font-weight:500
+classDef entryPoint fill:#2b6cb0,stroke:#3182ce,stroke-width:3px,color:#ffffff,font-weight:600
+classDef process fill:#38a169,stroke:#48bb78,stroke-width:2px,color:#ffffff,font-weight:500
+classDef decision fill:#d69e2e,stroke:#ed8936,stroke-width:2px,color:#ffffff,font-weight:500
+classDef service fill:#805ad5,stroke:#9f7aea,stroke-width:2px,color:#ffffff,font-weight:500
+classDef result fill:#e53e3e,stroke:#f56565,stroke-width:2px,color:#ffffff,font-weight:500
+classDef complete fill:#38a169,stroke:#48bb78,stroke-width:3px,color:#ffffff,font-weight:600
+\\\`\\\`\\\`
+
+FLOWCHART STRUCTURE REQUIREMENTS:
+1. Start with "User creates Agent with task" as the entry point
+2. Use 'flowchart TD' syntax for professional top-down flow
+3. Create logical execution sequence: Entry → Initialization → Main Loop → Decision Points → Results
+4. Include decision diamonds {} with specific labels like "Action Type?", "Task complete?", "Error occurred?"
+5. Add branching with descriptive edge labels like |Yes|, |No|, |click_element|, |input_text|
+6. Create organized subgraphs for layers:
+   - subgraph BrowserLayer_["Browser Layer"]
+   - subgraph AILayer_["AI Layer"] 
+   - subgraph ActionLayer_["Action Layer"]
+   - subgraph ServiceLayer_["Service Layer"]
+7. Show clear execution paths and loops
+8. Include error handling and completion flows
+9. Use clean, descriptive node labels without icons
+10. Apply the exact styling classes to nodes based on their function
+
+EXPECTED STRUCTURE PATTERN:
+- Entry point → Main initialization
+- Initialization → Setup functions
+- Main execution loop with step functions
+- Decision points for different action types
+- Branching to specific handlers
+- Result processing and completion checks
+- Error handling paths
+- Final completion or loop back
+
+Generate a professional flowchart that matches the sophisticated visual style of enterprise software architecture diagrams, with clean subgraph organization and consistent dark theme styling.
+
+Return ONLY the complete Mermaid flowchart code with all styling included.`;
+	}
+
+	buildClaudePrompt(analysisData) {
+		const { structure, stats, functionAnalysis } = analysisData;
+		
+		let prompt = `Please create a detailed, unified flowchart representing both the repository structure and key functions of this codebase:
 
 Repository Statistics:
 - Total Files: ${stats.totalFiles}
 - Total Directories: ${stats.totalDirectories}
 - Total Lines of Code: ${stats.totalLines}
-- File Types: ${JSON.stringify(stats.fileTypes, null, 2)}
+- File Types: ${JSON.stringify(stats.fileTypes, null, 2)}`;
+
+		// Add function analysis if available
+		if (functionAnalysis && functionAnalysis.functions.length > 0) {
+			const totalFunctions = functionAnalysis.functions.length;
+			const keyFunctions = functionAnalysis.functions
+				.filter(func => 
+					func.name.includes('main') || func.name.includes('init') || 
+					func.name.includes('handle') || func.name.includes('process') ||
+					func.name.includes('generate') || func.name.includes('analyze') ||
+					func.name.includes('create') || func.name.includes('run')
+				)
+				.slice(0, 12); // Intelligent limit based on importance
+
+			prompt += `
+
+Function Analysis:
+- Total Functions: ${totalFunctions}
+- Total Classes: ${functionAnalysis.metadata.totalClasses}
+- Key Functions to Include:
+${keyFunctions.map(func => `  • ${func.name} (${func.type}) in ${func.file}${func.class ? ` [${func.class}]` : ''}`).join('\n')}`;
+
+			if (totalFunctions > 12) {
+				prompt += `
+- Note: Showing ${keyFunctions.length} most important functions out of ${totalFunctions} total for clarity`;
+			}
+		}
+
+		prompt += `
 
 Repository Structure:
 ${JSON.stringify(structure, null, 2)}
 
-Please create a visual flowchart that shows:
-1. The main directory structure
-2. Key file relationships
-3. Project architecture flow
-4. Important configuration files
-5. Main code organization
+Please create a unified visual flowchart that shows:
+1. **Repository Architecture**: Main directory structure and file organization
+2. **Key Function Flow**: Entry points, main execution paths, and important functions
+3. **Component Relationships**: How directories, files, and functions interact
+4. **Data Flow**: Show how information moves through the system
 
-Use Mermaid syntax for the flowchart so it can be easily rendered. Focus on the most important files and directories, grouping similar files together for clarity.`;
+Requirements:
+- Use 'graph TD' syntax for top-down flowchart
+- Include meaningful icons using emojis for visual appeal
+- **Smart Function Integration**: Include ${functionAnalysis ? 'the key functions listed above' : 'any identifiable code patterns'} as execution nodes
+- Group related components logically using subgraphs
+- Show clear relationships with descriptive arrows
+- Use clean, professional styling with classDef
+- Balance detail with readability - focus on the most important architectural elements
+- **Intelligent Scope**: Show enough detail to understand the system without overwhelming complexity
+
+Return ONLY the Mermaid code, starting with 'graph TD' and including professional styling at the end.`;
+
+		return prompt;
 	}
 
 	generateMermaidFlowchart(analysisData) {
-		const { structure, stats } = analysisData;
+		const { structure, stats, functionAnalysis } = analysisData;
 		
 		let mermaidCode = `graph TD\n`;
 		let nodeId = 0;
@@ -533,12 +1218,37 @@ Use Mermaid syntax for the flowchart so it can be easily rendered. Focus on the 
 		const rootId = getNodeId('Repository');
 		mermaidCode += `    ${rootId}[📁 Repository]\n`;
 		
-		// Add stats summary
+		// Add stats summary with function info
 		const statsId = getNodeId('Stats');
-		mermaidCode += `    ${statsId}[📊 ${stats.totalFiles} files, ${stats.totalDirectories} dirs]\n`;
+		const functionCount = functionAnalysis ? functionAnalysis.functions.length : 0;
+		const functionText = functionCount > 0 ? `, ${functionCount} functions` : '';
+		mermaidCode += `    ${statsId}[📊 ${stats.totalFiles} files, ${stats.totalDirectories} dirs${functionText}]\n`;
 		mermaidCode += `    ${rootId} --> ${statsId}\n`;
 		
-		// Process directory structure
+		// Add key functions section if available
+		if (functionAnalysis && functionAnalysis.functions.length > 0) {
+			const keyFunctions = this.selectKeyFunctions(functionAnalysis.functions, stats.totalFiles);
+			
+			if (keyFunctions.length > 0) {
+				const functionsId = getNodeId('KeyFunctions');
+				mermaidCode += `    ${functionsId}[⚡ Key Functions (${keyFunctions.length})]\n`;
+				mermaidCode += `    ${rootId} --> ${functionsId}\n`;
+				
+				// Add individual key functions
+				keyFunctions.forEach(func => {
+					const funcId = getNodeId(sanitizeName(func.name));
+					const cleanName = this.cleanFunctionName(func.name);
+					const icon = this.getFunctionIcon(func);
+					mermaidCode += `    ${funcId}[${icon} ${cleanName}]\n`;
+					mermaidCode += `    ${functionsId} --> ${funcId}\n`;
+				});
+				
+				// Add execution flow between key functions if detectable
+				this.addFunctionFlow(mermaidCode, keyFunctions, getNodeId, sanitizeName);
+			}
+		}
+
+		// Process directory structure (existing logic)
 		const processItems = (items, parentId, level = 0) => {
 			if (level > 3) return; // Limit depth for readability
 			
@@ -595,12 +1305,109 @@ Use Mermaid syntax for the flowchart so it can be easily rendered. Focus on the 
 		
 		processItems(structure, rootId);
 		
-		// Add styling
+		// Add enhanced styling for unified view
 		mermaidCode += `\n    classDef dirStyle fill:#e1f5fe,stroke:#01579b,stroke-width:2px\n`;
 		mermaidCode += `    classDef fileStyle fill:#f3e5f5,stroke:#4a148c,stroke-width:2px\n`;
 		mermaidCode += `    classDef configStyle fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px\n`;
+		mermaidCode += `    classDef functionStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px\n`;
+		mermaidCode += `    classDef keyFunctionStyle fill:#fce4ec,stroke:#880e4f,stroke-width:3px\n`;
 		
 		return mermaidCode;
+	}
+
+	// Helper method to intelligently select key functions based on repository size
+	selectKeyFunctions(functions, totalFiles) {
+		// Determine how many functions to show based on repository size
+		let maxFunctions;
+		if (totalFiles < 10) {
+			maxFunctions = Math.min(8, functions.length); // Small repos: show more detail
+		} else if (totalFiles < 50) {
+			maxFunctions = Math.min(6, functions.length); // Medium repos: balanced view
+		} else {
+			maxFunctions = Math.min(4, functions.length); // Large repos: focus on essentials
+		}
+
+		// Priority-based selection
+		const priorities = [
+			func => func.name === 'main' || func.name === 'activate' || func.name === '__init__',
+			func => func.name.includes('init') || func.name.includes('setup'),
+			func => func.name.includes('handle') || func.name.includes('process'),
+			func => func.name.includes('generate') || func.name.includes('create'),
+			func => func.name.includes('analyze') || func.name.includes('build'),
+			func => func.name.includes('run') || func.name.includes('execute'),
+			func => func.isMethod && func.class,
+			func => func.type === 'async-function'
+		];
+
+		const selected = [];
+		const used = new Set();
+
+		// Select functions by priority
+		for (const priority of priorities) {
+			if (selected.length >= maxFunctions) break;
+			
+			const candidates = functions.filter(func => 
+				!used.has(func.name) && priority(func)
+			);
+			
+			for (const func of candidates) {
+				if (selected.length >= maxFunctions) break;
+				selected.push(func);
+				used.add(func.name);
+			}
+		}
+
+		// Fill remaining slots with any important-looking functions
+		if (selected.length < maxFunctions) {
+			const remaining = functions.filter(func => 
+				!used.has(func.name) && 
+				!func.name.startsWith('_') && 
+				func.name.length > 2
+			).slice(0, maxFunctions - selected.length);
+			
+			selected.push(...remaining);
+		}
+
+		return selected;
+	}
+
+	// Helper method to get appropriate icon for function type
+	getFunctionIcon(func) {
+		if (func.name === 'main' || func.name === 'activate') return '🚀';
+		if (func.name.includes('init') || func.name.includes('setup')) return '🔧';
+		if (func.name.includes('handle') || func.name.includes('process')) return '⚙️';
+		if (func.name.includes('generate') || func.name.includes('create')) return '✨';
+		if (func.name.includes('analyze') || func.name.includes('build')) return '🔍';
+		if (func.type === 'async-function') return '⚡';
+		if (func.isMethod) return '🔗';
+		return '📝';
+	}
+
+	// Helper method to add execution flow between functions (simplified)
+	addFunctionFlow(mermaidCode, keyFunctions, getNodeId, sanitizeName) {
+		// Simple heuristic: connect functions that might call each other
+		for (let i = 0; i < keyFunctions.length - 1; i++) {
+			const current = keyFunctions[i];
+			const next = keyFunctions[i + 1];
+			
+			// Connect if there's a logical flow (init -> handle -> process, etc.)
+			if (this.shouldConnectFunctions(current, next)) {
+				const currentId = getNodeId(sanitizeName(current.name));
+				const nextId = getNodeId(sanitizeName(next.name));
+				mermaidCode += `    ${currentId} -.-> ${nextId}\n`;
+			}
+		}
+	}
+
+	// Helper method to determine if functions should be connected
+	shouldConnectFunctions(func1, func2) {
+		const initKeywords = ['init', 'setup', 'create', 'load'];
+		const processKeywords = ['handle', 'process', 'execute', 'run'];
+		
+		const func1IsInit = initKeywords.some(kw => func1.name.includes(kw));
+		const func2IsProcess = processKeywords.some(kw => func2.name.includes(kw));
+		
+		return func1IsInit && func2IsProcess;
 	}
 
 	async generateClaudeFlowchart(analysisData) {
@@ -887,29 +1694,25 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			cursor: grab;
 		}
 		
-		/* Force dark text in Mermaid diagrams for better readability */
+		/* Professional dark theme styling for Mermaid diagrams */
 		#mermaid-diagram svg text,
 		#mermaid-diagram svg .nodeLabel,
 		#mermaid-diagram svg .edgeLabel,
 		#mermaid-diagram svg .label {
-			fill: #212529 !important;
-			color: #212529 !important;
+			font-family: Inter, system-ui, sans-serif !important;
 			font-weight: 500 !important;
+			font-size: 14px !important;
 		}
 		
-		/* Ensure node backgrounds are light */
-		#mermaid-diagram svg .node rect,
-		#mermaid-diagram svg .node circle,
-		#mermaid-diagram svg .node polygon {
-			fill: #ffffff !important;
-			stroke: #0078d4 !important;
-			stroke-width: 2px !important;
-		}
-		
-		/* Make edge labels more visible */
+		/* Enhance readability with proper contrast */
 		#mermaid-diagram svg .edgePath .path {
-			stroke: #0078d4 !important;
 			stroke-width: 2px !important;
+		}
+		
+		/* Subgraph styling for professional appearance */
+		#mermaid-diagram svg .cluster rect {
+			rx: 8px !important;
+			ry: 8px !important;
 		}
 		
 		#mermaid-diagram.zoomed {
@@ -1177,6 +1980,9 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				<button class="btn btn-small" id="refreshBtn" onclick="regenerateFlowchart()">
 					Refresh
 				</button>
+				<button class="btn btn-small" onclick="generateFunctionChart()" title="Generate detailed function-only flowchart">
+					Detailed Functions
+				</button>
 				<button class="btn btn-small" onclick="copyMermaidCode()">
 					Copy Code
 				</button>
@@ -1205,7 +2011,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		
 		<div class="details-panel">
 			<button class="details-toggle" onclick="toggleDetails()">
-				<span>Repository Details & Analysis</span>
+				<span>Repository & Function Analysis</span>
 				<span id="toggleIcon">▲</span>
 			</button>
 			<div class="details-content" id="detailsContent">
@@ -1257,32 +2063,40 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		document.addEventListener('DOMContentLoaded', () => {
 			mermaid.initialize({ 
 				startOnLoad: false,
-				theme: 'base',
+				theme: 'dark',
 				themeVariables: {
-					// Use light backgrounds with dark text for maximum readability
-					primaryColor: '#f8f9fa',
-					primaryTextColor: '#212529',
-					primaryBorderColor: '#0078d4',
-					lineColor: '#0078d4',
-					secondaryColor: '#e9ecef',
-					tertiaryColor: '#dee2e6',
-					background: '#ffffff',
-					mainBkg: '#ffffff',
-					secondBkg: '#f8f9fa',
-					tertiaryTextColor: '#212529',
-					labelTextColor: '#212529',
-					textColor: '#212529',
-					nodeTextColor: '#212529',
-					// Ensure all text elements use dark colors
-					cScale0: '#f8f9fa',
-					cScale1: '#e9ecef',
-					cScale2: '#dee2e6',
-					// Node-specific styling
-					nodeBkg: '#ffffff',
-					nodeTextColor: '#212529',
-					// Arrow and line colors
-					edgeLabelBackground: '#ffffff',
-					edgeLabelColor: '#212529'
+					// Professional dark theme matching the example image
+					primaryColor: '#2d3748',
+					primaryTextColor: '#e2e8f0',
+					primaryBorderColor: '#4a5568',
+					lineColor: '#718096',
+					secondaryColor: '#374151',
+					tertiaryColor: '#4a5568',
+					background: '#1a202c',
+					mainBkg: '#2d3748',
+					secondBkg: '#374151',
+					tertiaryTextColor: '#e2e8f0',
+					labelTextColor: '#ffffff',
+					textColor: '#e2e8f0',
+					nodeTextColor: '#ffffff',
+					// Dark theme colors
+					cScale0: '#2d3748',
+					cScale1: '#374151',
+					cScale2: '#4a5568',
+					// Node styling for dark theme
+					nodeBkg: '#2d3748',
+					nodeTextColor: '#ffffff',
+					// Arrow and line colors for dark theme
+					edgeLabelBackground: 'rgba(45, 55, 72, 0.9)',
+					edgeLabelColor: '#ffffff',
+					// Subgraph styling
+					clusterBkg: '#374151',
+					clusterBorder: '#4a5568',
+					// Decision node colors
+					altBackground: '#d69e2e',
+					// Additional professional styling
+					fontFamily: 'Inter, system-ui, sans-serif',
+					fontSize: '14px'
 				}
 			});
 			
@@ -1318,6 +2132,17 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			vscode.postMessage({
 				command: 'generateFlowchart',
 				data: currentAnalysis
+			});
+		}
+
+		function generateFunctionChart() {
+			updateStatus('Analyzing functions...', 'generating');
+			updateLoadingText('Performing function-level analysis...', 'Scanning code files and building call graph...');
+			showLoading();
+			
+			vscode.postMessage({
+				command: 'generateFunctionFlowchart',
+				data: {}
 			});
 		}
 
@@ -1493,6 +2318,14 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			element.innerHTML = '';
 			
 			try {
+				// Validate mermaid code before rendering
+				if (!mermaidCode || mermaidCode.trim().length === 0) {
+					throw new Error('Empty Mermaid code provided');
+				}
+				
+				console.log('GraphIt: Rendering Mermaid diagram...');
+				console.log('GraphIt: Mermaid code length:', mermaidCode.length);
+				
 				const { svg } = await mermaid.render('mermaid-svg', mermaidCode);
 				element.innerHTML = svg;
 				
@@ -1516,9 +2349,21 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				
 				applyTransform();
 				hideLoading();
+				console.log('GraphIt: Mermaid diagram rendered successfully');
 			} catch (error) {
-				console.error('Error rendering Mermaid diagram:', error);
-				showError('Failed to render diagram. Check console for details.');
+				console.error('GraphIt: Error rendering Mermaid diagram:', error);
+				console.error('GraphIt: Mermaid code that failed:', mermaidCode);
+				
+				let errorMessage = 'Failed to render diagram';
+				if (error.message.includes('Parse error')) {
+					errorMessage += ': Invalid Mermaid syntax';
+				} else if (error.message.includes('Too many')) {
+					errorMessage += ': Diagram too complex';
+				} else {
+					errorMessage += ': ' + error.message;
+				}
+				
+				showError(errorMessage + '. Check console for details.');
 			}
 		}
 
@@ -1685,6 +2530,28 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			document.getElementById('stats').innerHTML = statsHtml;
 		}
 
+		function renderFunctionStats(metadata) {
+			const statsHtml = \`
+				<div class="stat-card">
+					<div class="stat-number">\${metadata.totalFunctions}</div>
+					<div class="stat-label">Functions</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-number">\${metadata.totalClasses}</div>
+					<div class="stat-label">Classes</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-number">📊</div>
+					<div class="stat-label">Function-Level</div>
+				</div>
+				<div class="stat-card">
+					<div class="stat-number">🔄</div>
+					<div class="stat-label">Call Graph</div>
+				</div>
+			\`;
+			document.getElementById('stats').innerHTML = statsHtml;
+		}
+
 		function renderStructure(structure, level = 0) {
 			let html = '';
 			const indent = '  '.repeat(level);
@@ -1755,6 +2622,28 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					console.log('GraphIt: Selective update applied - preserving visual state');
 					
 					renderMermaidDiagram(message.data.mermaidCode, true, message.data.updatePlan);
+					break;
+
+				case 'functionFlowchartGenerated':
+					currentMermaidCode = message.data.mermaidCode;
+					
+					document.getElementById('claudePrompt').textContent = message.data.claudePrompt;
+					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
+					
+					// Show function chart generation status
+					updateStatus(message.data.message, 'completed');
+					console.log('GraphIt: Function-level flowchart generated');
+					
+					// Update title to indicate function-level mode
+					document.querySelector('.header h1').textContent = 'GraphIt - Function Level Analysis';
+					
+					// Render the detailed function flowchart with dark theme
+					renderMermaidDiagram(message.data.mermaidCode, false);
+					
+					// Update stats with function data
+					if (message.data.functionAnalysis) {
+						renderFunctionStats(message.data.functionAnalysis.metadata);
+					}
 					break;
 					
 				case 'autoRefreshStarted':
@@ -1932,16 +2821,26 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			if (significantChanges) {
 				console.log('GraphIt: Significant changes detected, performing selective update');
 				
-				// Use the new incremental update mechanism instead of full regeneration
-				this.panel.webview.postMessage({
-					command: 'updateIncrementalChanges',
-					data: {
-						...currentAnalysis,
-						hasClaudeApi: !!anthropicClient && !!config?.flowchart?.enableClaudeGeneration,
-						isIncremental: true,
-						changedFiles: Array.from(this.changedFiles)
-					}
-				});
+				if (this.currentViewMode === 'function') {
+					// Auto-refresh function flowchart
+					console.log('GraphIt: Auto-refreshing function flowchart...');
+					await this.handleGenerateFunctionFlowchart({});
+				} else if (this.currentViewMode === 'unified') {
+					// Auto-refresh unified view (repository + functions)
+					console.log('GraphIt: Auto-refreshing unified flowchart...');
+					await this.handleGenerateFlowchart(currentAnalysis);
+				} else {
+					// Use the new incremental update mechanism for repository view
+					this.panel.webview.postMessage({
+						command: 'updateIncrementalChanges',
+						data: {
+							...currentAnalysis,
+							hasClaudeApi: !!anthropicClient && !!config?.flowchart?.enableClaudeGeneration,
+							isIncremental: true,
+							changedFiles: Array.from(this.changedFiles)
+						}
+					});
+				}
 				
 				this.lastAnalysis = currentAnalysis;
 			} else {
@@ -2030,3 +2929,4 @@ module.exports = {
 	activate,
 	deactivate
 }
+
