@@ -675,6 +675,31 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			cursor: grab;
 		}
 		
+		/* Force dark text in Mermaid diagrams for better readability */
+		#mermaid-diagram svg text,
+		#mermaid-diagram svg .nodeLabel,
+		#mermaid-diagram svg .edgeLabel,
+		#mermaid-diagram svg .label {
+			fill: #212529 !important;
+			color: #212529 !important;
+			font-weight: 500 !important;
+		}
+		
+		/* Ensure node backgrounds are light */
+		#mermaid-diagram svg .node rect,
+		#mermaid-diagram svg .node circle,
+		#mermaid-diagram svg .node polygon {
+			fill: #ffffff !important;
+			stroke: #0078d4 !important;
+			stroke-width: 2px !important;
+		}
+		
+		/* Make edge labels more visible */
+		#mermaid-diagram svg .edgePath .path {
+			stroke: #0078d4 !important;
+			stroke-width: 2px !important;
+		}
+		
 		#mermaid-diagram.zoomed {
 			cursor: grab;
 		}
@@ -1014,28 +1039,32 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		document.addEventListener('DOMContentLoaded', () => {
 			mermaid.initialize({ 
 				startOnLoad: false,
-				theme: 'dark',
+				theme: 'base',
 				themeVariables: {
-					primaryColor: '#0078d4',
-					primaryTextColor: '#ffffff',
-					primaryBorderColor: '#106ebe',
-					lineColor: '#0078d4',
-					sectionBkgColor: '#1e1e1e',
-					altSectionBkgColor: '#2d2d30',
-					gridColor: '#404040',
-					tertiaryColor: '#252526',
-					background: '#1e1e1e',
-					mainBkg: '#2d2d30',
-					secondBkg: '#252526',
-					tertiaryColor: '#404040',
+					// Use light backgrounds with dark text for maximum readability
+					primaryColor: '#f8f9fa',
+					primaryTextColor: '#212529',
 					primaryBorderColor: '#0078d4',
-					primaryTextColor: '#ffffff',
 					lineColor: '#0078d4',
-					secondaryColor: '#005a9e',
-					tertiaryTextColor: '#ffffff',
-					labelTextColor: '#ffffff',
-					textColor: '#ffffff',
-					nodeTextColor: '#ffffff'
+					secondaryColor: '#e9ecef',
+					tertiaryColor: '#dee2e6',
+					background: '#ffffff',
+					mainBkg: '#ffffff',
+					secondBkg: '#f8f9fa',
+					tertiaryTextColor: '#212529',
+					labelTextColor: '#212529',
+					textColor: '#212529',
+					nodeTextColor: '#212529',
+					// Ensure all text elements use dark colors
+					cScale0: '#f8f9fa',
+					cScale1: '#e9ecef',
+					cScale2: '#dee2e6',
+					// Node-specific styling
+					nodeBkg: '#ffffff',
+					nodeTextColor: '#212529',
+					// Arrow and line colors
+					edgeLabelBackground: '#ffffff',
+					edgeLabelColor: '#212529'
 				}
 			});
 			
@@ -1468,62 +1497,95 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		if (!workspaceFolders) return;
 
-		// Get Git extension
-		const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
-		if (!gitExtension) {
-			console.log('GraphIt: Git extension not found, falling back to file watcher');
-			this.setupFallbackWatcher();
-			return;
-		}
-
-		const git = gitExtension.getAPI(1);
-		const repository = git.repositories[0];
-		
-		if (!repository) {
-			console.log('GraphIt: No Git repository found, falling back to file watcher');
-			this.setupFallbackWatcher();
-			return;
-		}
-
-		const debouncedRefresh = () => {
-			// Only refresh if auto-refresh is enabled
-			if (!this.autoRefreshEnabled) return;
+		try {
+			// Check if Git extension is available and activated
+			const gitExtension = vscode.extensions.getExtension('vscode.git');
 			
-			// Clear existing timeout
-			if (this.refreshTimeout) {
-				clearTimeout(this.refreshTimeout);
+			if (!gitExtension) {
+				console.log('GraphIt: Git extension not installed, using file system watcher');
+				this.setupFallbackWatcher();
+				return;
 			}
-			
-			// Set new timeout - refresh after 2 seconds of inactivity
-			this.refreshTimeout = setTimeout(async () => {
-				console.log('GraphIt: Auto-refreshing due to Git changes...');
-				
-				// Get changed files from Git
-				const changes = repository.state.workingTreeChanges;
-				const stagedChanges = repository.state.indexChanges;
-				
-				this.changedFiles.clear();
-				[...changes, ...stagedChanges].forEach(change => {
-					this.changedFiles.add(change.uri.fsPath);
-				});
-				
-				console.log(`GraphIt: Detected ${this.changedFiles.size} changed files`);
-				
-				// Notify the webview that auto-refresh is happening
-				this.panel.webview.postMessage({
-					command: 'autoRefreshStarted'
-				});
-				
-				await this.handleIncrementalUpdate();
-			}, 2000);
-		};
 
-		// Listen to Git repository state changes
-		repository.state.onDidChange(debouncedRefresh, null, this.disposables);
-		
-		this.disposables.push(repository);
-		console.log('GraphIt: Git-based change tracking activated');
-		this.gitWatcher = repository;
+			if (!gitExtension.isActive) {
+				console.log('GraphIt: Git extension not activated, trying to activate...');
+				Promise.resolve(gitExtension.activate()).then(() => {
+					console.log('GraphIt: Git extension activated, setting up Git watcher');
+					this.initializeGitWatcher();
+				}, () => {
+					console.log('GraphIt: Failed to activate Git extension, using file system watcher');
+					this.setupFallbackWatcher();
+				});
+				return;
+			}
+
+			this.initializeGitWatcher();
+		} catch (error) {
+			console.log('GraphIt: Error accessing Git extension, using file system watcher:', error.message);
+			this.setupFallbackWatcher();
+		}
+	}
+
+	initializeGitWatcher() {
+		try {
+			const gitExtension = vscode.extensions.getExtension('vscode.git')?.exports;
+			if (!gitExtension) {
+				this.setupFallbackWatcher();
+				return;
+			}
+
+			const git = gitExtension.getAPI(1);
+			if (!git || !git.repositories || git.repositories.length === 0) {
+				console.log('GraphIt: No Git repository found in workspace, using file system watcher');
+				this.setupFallbackWatcher();
+				return;
+			}
+
+			const repository = git.repositories[0];
+
+			const debouncedRefresh = () => {
+				// Only refresh if auto-refresh is enabled
+				if (!this.autoRefreshEnabled) return;
+				
+				// Clear existing timeout
+				if (this.refreshTimeout) {
+					clearTimeout(this.refreshTimeout);
+				}
+				
+				// Set new timeout - refresh after 2 seconds of inactivity
+				this.refreshTimeout = setTimeout(async () => {
+					console.log('GraphIt: Auto-refreshing due to Git changes...');
+					
+					// Get changed files from Git
+					const changes = repository.state.workingTreeChanges;
+					const stagedChanges = repository.state.indexChanges;
+					
+					this.changedFiles.clear();
+					[...changes, ...stagedChanges].forEach(change => {
+						this.changedFiles.add(change.uri.fsPath);
+					});
+					
+					console.log(`GraphIt: Detected ${this.changedFiles.size} changed files`);
+					
+					// Notify the webview that auto-refresh is happening
+					this.panel.webview.postMessage({
+						command: 'autoRefreshStarted'
+					});
+					
+					await this.handleIncrementalUpdate();
+				}, 2000);
+			};
+
+			// Listen to Git repository state changes
+			repository.state.onDidChange(debouncedRefresh, null, this.disposables);
+			
+			this.disposables.push(repository);
+			console.log('GraphIt: Git-based change tracking activated');
+			this.gitWatcher = repository;
+		} catch (error) {
+			console.log('GraphIt: Error initializing Git watcher, using file system watcher:', error.message);
+			this.setupFallbackWatcher();
+		}
 	}
 
 	setupFallbackWatcher() {
