@@ -174,6 +174,9 @@ class GraphItPanel {
 		this.gitWatcher = null;
 		this.lastAnalysis = null;
 		this.changedFiles = new Set();
+		this.previousFlowchartState = null;
+		this.currentFlowchartNodes = new Map();
+		this.currentFlowchartEdges = new Set();
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 		this.panel.webview.html = this.getWebviewContent();
@@ -183,17 +186,20 @@ class GraphItPanel {
 		
 		this.panel.webview.onDidReceiveMessage(
 			async message => {
-				switch (message.command) {
-					case 'analyzeRepository':
-						await this.handleAnalyzeRepository();
-						break;
-					case 'generateFlowchart':
-						await this.handleGenerateFlowchart(message.data);
-						break;
-					case 'toggleAutoRefresh':
-						this.toggleAutoRefresh(message.enabled);
-						break;
-				}
+							switch (message.command) {
+				case 'analyzeRepository':
+					await this.handleAnalyzeRepository();
+					break;
+				case 'generateFlowchart':
+					await this.handleGenerateFlowchart(message.data);
+					break;
+				case 'toggleAutoRefresh':
+					this.toggleAutoRefresh(message.enabled);
+					break;
+				case 'updateIncrementalChanges':
+					await this.handleIncrementalFlowchartUpdate(message.data);
+					break;
+			}
 			},
 			null,
 			this.disposables
@@ -254,6 +260,9 @@ class GraphItPanel {
 			const mermaidCode = await this.generateClaudeFlowchart(analysisData);
 			const claudePrompt = this.buildClaudePrompt(analysisData);
 			
+			// Store the current flowchart state for future incremental updates
+			this.storeFlowchartState(analysisData, mermaidCode);
+			
 			const message = anthropicClient && config?.flowchart?.enableClaudeGeneration 
 				? 'Flowchart generated with Claude 4 Sonnet!' 
 				: 'Flowchart generated locally!';
@@ -264,13 +273,216 @@ class GraphItPanel {
 					mermaidCode,
 					claudePrompt,
 					message,
-					source: anthropicClient ? 'claude' : 'local'
+					source: anthropicClient ? 'claude' : 'local',
+					isIncremental: false
 				}
 			});
 		} catch (error) {
 			console.error('GraphIt: Error generating flowchart:', error);
 			vscode.window.showErrorMessage('Failed to generate flowchart: ' + error.message);
 		}
+	}
+
+	async handleIncrementalFlowchartUpdate(data) {
+		try {
+			if (!this.previousFlowchartState) {
+				// No previous state, do full refresh
+				await this.handleGenerateFlowchart(data);
+				return;
+			}
+
+			console.log('GraphIt: Performing selective flowchart update...');
+			
+			// Calculate what parts of the flowchart need updating
+			const updatePlan = this.calculateFlowchartDiff(data);
+			
+			if (updatePlan.hasSignificantChanges) {
+				// Generate updated mermaid code with change annotations
+				const updatedMermaidCode = await this.generateIncrementalMermaidCode(data, updatePlan);
+				const claudePrompt = this.buildClaudePrompt(data);
+				
+				// Update stored state
+				this.storeFlowchartState(data, updatedMermaidCode);
+				
+				this.panel.webview.postMessage({
+					command: 'flowchartUpdatedIncremental',
+					data: {
+						mermaidCode: updatedMermaidCode,
+						claudePrompt,
+						updatePlan,
+						message: `Updated ${updatePlan.changedNodes.length} nodes, ${updatePlan.changedEdges.length} edges`,
+						source: anthropicClient ? 'claude' : 'local',
+						isIncremental: true
+					}
+				});
+			} else {
+				console.log('GraphIt: No significant changes detected, keeping flowchart frozen');
+			}
+		} catch (error) {
+			console.error('GraphIt: Error in incremental flowchart update:', error);
+			// Fallback to full refresh on error
+			await this.handleGenerateFlowchart(data);
+		}
+	}
+
+	storeFlowchartState(analysisData, mermaidCode) {
+		this.previousFlowchartState = {
+			analysis: JSON.parse(JSON.stringify(analysisData)),
+			mermaidCode,
+			timestamp: Date.now()
+		};
+		
+		// Parse and store the current flowchart structure
+		this.parseFlowchartStructure(mermaidCode);
+	}
+
+	parseFlowchartStructure(mermaidCode) {
+		this.currentFlowchartNodes.clear();
+		this.currentFlowchartEdges.clear();
+		
+		const lines = mermaidCode.split('\n');
+		for (const line of lines) {
+			const trimmed = line.trim();
+			
+			// Parse node definitions (e.g., "n1[📁 Repository]")
+			const nodeMatch = trimmed.match(/^\s*(\w+)\[(.*?)\]/);
+			if (nodeMatch) {
+				this.currentFlowchartNodes.set(nodeMatch[1], {
+					id: nodeMatch[1],
+					label: nodeMatch[2],
+					line: trimmed
+				});
+			}
+			
+			// Parse edges (e.g., "n1 --> n2")
+			const edgeMatch = trimmed.match(/^\s*(\w+)\s*-->\s*(\w+)/);
+			if (edgeMatch) {
+				this.currentFlowchartEdges.add(`${edgeMatch[1]}->${edgeMatch[2]}`);
+			}
+		}
+	}
+
+	calculateFlowchartDiff(newAnalysisData) {
+		if (!this.previousFlowchartState) {
+			return { hasSignificantChanges: true, changedNodes: [], changedEdges: [], newNodes: [], removedNodes: [] };
+		}
+
+		const changedFiles = Array.from(this.changedFiles);
+		const changedNodes = [];
+		const changedEdges = [];
+		const newNodes = [];
+		const removedNodes = [];
+
+		// Identify which parts of the flowchart correspond to changed files
+		for (const filePath of changedFiles) {
+			const fileName = path.basename(filePath);
+			const dirName = path.dirname(filePath).split(path.sep).pop();
+			
+			// Find nodes that represent this file or directory
+			for (const [nodeId, nodeData] of this.currentFlowchartNodes) {
+				if (nodeData.label.includes(fileName) || nodeData.label.includes(dirName)) {
+					changedNodes.push(nodeId);
+				}
+			}
+		}
+
+		// Check for structural changes (new/removed directories)
+		const oldStats = this.previousFlowchartState.analysis.stats;
+		const newStats = newAnalysisData.stats;
+		
+		const hasStructuralChanges = 
+			oldStats.totalDirectories !== newStats.totalDirectories ||
+			Object.keys(oldStats.fileTypes).length !== Object.keys(newStats.fileTypes).length;
+
+		return {
+			hasSignificantChanges: changedNodes.length > 0 || hasStructuralChanges,
+			changedNodes,
+			changedEdges,
+			newNodes,
+			removedNodes,
+			changedFiles,
+			hasStructuralChanges
+		};
+	}
+
+	async generateIncrementalMermaidCode(analysisData, updatePlan) {
+		if (!anthropicClient || !config?.flowchart?.enableClaudeGeneration) {
+			return this.generateIncrementalMermaidLocal(analysisData, updatePlan);
+		}
+
+		const { structure, stats } = analysisData;
+		
+		const prompt = `You are updating an existing Mermaid flowchart. ONLY modify the parts that have changed.
+
+PREVIOUS FLOWCHART STATE:
+${this.previousFlowchartState.mermaidCode}
+
+CHANGED FILES (${updatePlan.changedFiles.length}):
+${updatePlan.changedFiles.map(file => `- ${file}`).join('\n')}
+
+CURRENT REPOSITORY STRUCTURE:
+${JSON.stringify(structure, null, 2)}
+
+INSTRUCTIONS:
+1. Keep ALL unchanged nodes and edges EXACTLY as they were
+2. Only update nodes that correspond to the changed files: ${updatePlan.changedNodes.join(', ')}
+3. Add visual indicators (colors/styling) to highlight changed elements
+4. Preserve the overall layout and structure
+5. Use the same node IDs where possible
+
+Generate the updated Mermaid code that freezes unchanged parts and only updates the modified sections.`;
+
+		try {
+			const response = await anthropicClient.messages.create({
+				model: config.anthropic?.model || 'claude-3-5-sonnet-20241022',
+				max_tokens: config.anthropic?.maxTokens || 4000,
+				temperature: 0.1, // Lower temperature for more consistent updates
+				messages: [{ role: 'user', content: prompt }]
+			});
+
+			const claudeResponse = response.content[0].text.trim();
+			const mermaidMatch = claudeResponse.match(/```(?:mermaid)?\s*\n?(graph\s+TD[\s\S]*?)```/i);
+			
+			if (mermaidMatch) {
+				return this.addChangeHighlighting(mermaidMatch[1].trim(), updatePlan);
+			}
+			
+			return this.generateIncrementalMermaidLocal(analysisData, updatePlan);
+		} catch (error) {
+			console.error('GraphIt: Claude incremental update failed:', error);
+			return this.generateIncrementalMermaidLocal(analysisData, updatePlan);
+		}
+	}
+
+	generateIncrementalMermaidLocal(analysisData, updatePlan) {
+		if (!this.previousFlowchartState) {
+			return this.generateMermaidFlowchart(analysisData);
+		}
+
+		let mermaidCode = this.previousFlowchartState.mermaidCode;
+		
+		// Add change highlighting to the existing flowchart
+		mermaidCode = this.addChangeHighlighting(mermaidCode, updatePlan);
+		
+		return mermaidCode;
+	}
+
+	addChangeHighlighting(mermaidCode, updatePlan) {
+		let highlightedCode = mermaidCode;
+		
+		// Add styling for changed nodes
+		if (updatePlan.changedNodes.length > 0) {
+			highlightedCode += `\n\n    %% Change highlighting\n`;
+			highlightedCode += `    classDef changed fill:#ffe6e6,stroke:#ff4444,stroke-width:3px,stroke-dasharray: 5 5\n`;
+			highlightedCode += `    classDef unchanged fill:#f0f8f0,stroke:#28a745,stroke-width:2px\n`;
+			
+			// Apply changed styling to modified nodes
+			for (const nodeId of updatePlan.changedNodes) {
+				highlightedCode += `    class ${nodeId} changed\n`;
+			}
+		}
+		
+		return highlightedCode;
 	}
 
 	buildClaudePrompt(analysisData) {
@@ -739,6 +951,12 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		@keyframes spin {
 			0% { transform: rotate(0deg); }
 			100% { transform: rotate(360deg); }
+		}
+		
+		@keyframes pulse {
+			0% { transform: scale(1); opacity: 1; }
+			50% { transform: scale(1.05); opacity: 0.8; }
+			100% { transform: scale(1); opacity: 1; }
 		}
 		
 		.loading-text {
@@ -1264,25 +1482,68 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			zoomIndicator.textContent = \`\${Math.round(currentZoom * 100)}%\`;
 		}
 
-		async function renderMermaidDiagram(mermaidCode) {
+		async function renderMermaidDiagram(mermaidCode, preserveState = false, updatePlan = null) {
 			const element = document.getElementById('mermaid-diagram');
+			
+			// Store current visual state for preservation
+			const previousZoom = currentZoom;
+			const previousPanX = panX;
+			const previousPanY = panY;
+			
 			element.innerHTML = '';
 			
 			try {
 				const { svg } = await mermaid.render('mermaid-svg', mermaidCode);
 				element.innerHTML = svg;
 				
-				// Reset zoom and pan when new diagram is loaded
-				currentZoom = 2.0; // Start new diagrams at 200% zoom
-				panX = 0;
-				panY = 0;
-				applyTransform();
+				if (preserveState) {
+					// Preserve visual state for incremental updates
+					currentZoom = previousZoom;
+					panX = previousPanX;
+					panY = previousPanY;
+					console.log('GraphIt: Visual state preserved during incremental update');
+					
+					// Add subtle animation to highlight changes
+					if (updatePlan && updatePlan.changedNodes.length > 0) {
+						highlightChangedElements(updatePlan.changedNodes);
+					}
+				} else {
+					// Reset zoom and pan when new diagram is loaded
+					currentZoom = 2.0; // Start new diagrams at 200% zoom
+					panX = 0;
+					panY = 0;
+				}
 				
+				applyTransform();
 				hideLoading();
 			} catch (error) {
 				console.error('Error rendering Mermaid diagram:', error);
 				showError('Failed to render diagram. Check console for details.');
 			}
+		}
+
+		function highlightChangedElements(changedNodeIds) {
+			// Add a temporary pulse animation to changed elements
+			setTimeout(() => {
+				const svgElement = document.querySelector('#mermaid-diagram svg');
+				if (!svgElement) return;
+				
+				changedNodeIds.forEach(nodeId => {
+					const nodeElement = svgElement.querySelector(\`[id*="\${nodeId}"]\`);
+					if (nodeElement) {
+						nodeElement.style.animation = 'pulse 2s ease-in-out 3';
+						nodeElement.style.filter = 'drop-shadow(0 0 8px rgba(255, 68, 68, 0.6))';
+						
+						// Remove animation after completion
+						setTimeout(() => {
+							nodeElement.style.animation = '';
+							nodeElement.style.filter = '';
+						}, 6000);
+					}
+				});
+				
+				console.log(\`GraphIt: Highlighted \${changedNodeIds.length} changed elements\`);
+			}, 100); // Small delay to ensure SVG is rendered
 		}
 		
 		function toggleDetails() {
@@ -1480,7 +1741,20 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					const sourceText = message.data.source === 'claude' ? 'Generated with Claude AI' : 'Generated locally';
 					updateStatus(sourceText, 'completed');
 					
-					renderMermaidDiagram(message.data.mermaidCode);
+					renderMermaidDiagram(message.data.mermaidCode, false);
+					break;
+
+				case 'flowchartUpdatedIncremental':
+					currentMermaidCode = message.data.mermaidCode;
+					
+					document.getElementById('claudePrompt').textContent = message.data.claudePrompt;
+					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
+					
+					// Show selective update status
+					updateStatus(message.data.message, 'completed');
+					console.log('GraphIt: Selective update applied - preserving visual state');
+					
+					renderMermaidDiagram(message.data.mermaidCode, true, message.data.updatePlan);
 					break;
 					
 				case 'autoRefreshStarted':
@@ -1656,10 +1930,11 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			});
 
 			if (significantChanges) {
-				console.log('GraphIt: Significant changes detected, regenerating flowchart');
+				console.log('GraphIt: Significant changes detected, performing selective update');
 				
+				// Use the new incremental update mechanism instead of full regeneration
 				this.panel.webview.postMessage({
-					command: 'repositoryAnalyzed',
+					command: 'updateIncrementalChanges',
 					data: {
 						...currentAnalysis,
 						hasClaudeApi: !!anthropicClient && !!config?.flowchart?.enableClaudeGeneration,
@@ -1670,7 +1945,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				
 				this.lastAnalysis = currentAnalysis;
 			} else {
-				console.log('GraphIt: No significant changes, skipping regeneration');
+				console.log('GraphIt: No significant changes, keeping flowchart frozen');
 			}
 		} catch (error) {
 			console.error('GraphIt: Error in incremental update:', error);
