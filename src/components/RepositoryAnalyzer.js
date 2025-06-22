@@ -20,8 +20,11 @@ class RepositoryAnalyzer {
 
 	async analyzeRepository(workspaceRoot) {
 		console.log('GraphIt: Starting repository analysis...');
+		this.workspaceRoot = workspaceRoot;
 		const structure = await this.buildDirectoryStructure(workspaceRoot);
 		const stats = this.calculateStats(structure);
+		
+		console.log('GraphIt: Repository analysis completed:', stats);
 		
 		return {
 			structure,

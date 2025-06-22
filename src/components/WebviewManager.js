@@ -16,24 +16,89 @@ class WebviewManager {
 	<title>GraphIt - Repository Flowchart</title>
 	<script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
 	<style>
+		/* =================================================================
+		   CENTRALIZED STYLING CONFIGURATION
+		   ================================================================= */
+		
+		:root {
+			/* Core Color Palette - Monotone Professional Gray */
+			--primary-gray: 128, 128, 128;
+			--secondary-gray: 112, 112, 112;
+			--tertiary-gray: 96, 96, 96;
+			--text-light: 200, 200, 200;
+			
+			/* Primary Colors */
+			--primary-accent: #666;
+			--primary-accent-hover: #777;
+			
+			/* Surface Colors - All based on primary gray with varying opacity */
+			--surface-primary: rgba(var(--primary-gray), 0.1);
+			--surface-secondary: rgba(var(--tertiary-gray), 0.05);
+			--surface-tertiary: rgba(var(--secondary-gray), 0.15);
+			--surface-hover: rgba(var(--primary-gray), 0.2);
+			
+			/* Glass Effect System */
+			--glass-overlay: rgba(var(--primary-gray), 0.08);
+			--glass-overlay-hover: rgba(var(--primary-gray), 0.15);
+			--glass-border: rgba(var(--primary-gray), 0.15);
+			--glass-border-hover: rgba(var(--primary-gray), 0.3);
+			
+			/* Border System */
+			--border-subtle: rgba(var(--primary-gray), 0.2);
+			--border-medium: rgba(var(--primary-gray), 0.4);
+			--border-strong: rgba(var(--primary-gray), 0.6);
+			
+			/* Text Colors */
+			--text-primary: var(--vscode-editor-foreground);
+			--text-secondary: var(--vscode-descriptionForeground);
+			--text-muted: rgba(var(--text-light), 0.7);
+			
+			/* Mermaid Diagram Colors - Consistent with overall theme */
+			--mermaid-node-bg: rgba(var(--primary-gray), 0.15);
+			--mermaid-node-border: rgba(var(--primary-gray), 0.6);
+			--mermaid-text: rgba(var(--text-light), 0.9);
+			--mermaid-edge: rgba(var(--primary-gray), 0.8);
+			--mermaid-cluster-bg: rgba(var(--primary-gray), 0.12);
+			--mermaid-cluster-border: rgba(var(--primary-gray), 0.4);
+			
+			/* Component Specific */
+			--button-padding-small: 6px 10px;
+			--button-padding-normal: 8px 12px;
+			--border-radius-small: 4px;
+			--border-radius-medium: 6px;
+			--border-radius-large: 8px;
+			
+			/* Animation & Transitions */
+			--transition-fast: 0.1s ease;
+			--transition-normal: 0.2s ease;
+			--transition-slow: 0.3s ease;
+			
+			/* Spacing System */
+			--spacing-xs: 4px;
+			--spacing-sm: 8px;
+			--spacing-md: 12px;
+			--spacing-lg: 16px;
+			--spacing-xl: 20px;
+			--spacing-xxl: 24px;
+		}
+
+		/* =================================================================
+		   BASE STYLES
+		   ================================================================= */
+		
 		body {
 			font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
 			background-color: var(--vscode-editor-background);
-			color: var(--vscode-editor-foreground);
+			color: var(--text-primary);
 			margin: 0;
 			padding: 0;
 			line-height: 1.6;
 			overflow-x: hidden;
-			--primary-accent: #666;
-			--surface-primary: rgba(128, 128, 128, 0.1);
-			--surface-secondary: rgba(96, 96, 96, 0.05);
-			--surface-tertiary: rgba(112, 112, 112, 0.15);
-			--border-subtle: rgba(128, 128, 128, 0.2);
-			--text-primary: var(--vscode-editor-foreground);
-			--text-secondary: var(--vscode-descriptionForeground);
-			--glass-overlay: rgba(128, 128, 128, 0.08);
-			--glass-border: rgba(128, 128, 128, 0.15);
 		}
+		
+		/* =================================================================
+		   LAYOUT COMPONENTS
+		   ================================================================= */
 		
 		.main-container {
 			display: flex;
@@ -45,7 +110,7 @@ class WebviewManager {
 		.header {
 			background: var(--surface-primary);
 			backdrop-filter: blur(12px);
-			padding: 16px 24px;
+			padding: var(--spacing-lg) var(--spacing-xxl);
 			border-bottom: 1px solid var(--border-subtle);
 			display: flex;
 			justify-content: space-between;
@@ -67,38 +132,29 @@ class WebviewManager {
 			align-items: center;
 		}
 		
-		.zoom-indicator {
-			font-size: 11px;
-			color: var(--text-primary);
-			background: var(--glass-overlay);
-			backdrop-filter: blur(8px);
-			border: 1px solid var(--glass-border);
-			padding: 4px 8px;
-			border-radius: 6px;
-			margin-right: 12px;
-			font-family: monospace;
-			font-weight: 500;
-		}
+		/* =================================================================
+		   INTERACTIVE COMPONENTS
+		   ================================================================= */
 		
 		.btn {
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
 			color: var(--text-primary);
 			border: 1px solid var(--glass-border);
-			padding: 8px 12px;
-			border-radius: 6px;
+			padding: var(--button-padding-normal);
+			border-radius: var(--border-radius-medium);
 			cursor: pointer;
 			font-size: 12px;
 			display: flex;
 			align-items: center;
-			gap: 6px;
-			transition: all 0.2s ease;
+			gap: var(--spacing-sm);
+			transition: all var(--transition-normal);
 			font-weight: 500;
 		}
 		
 		.btn:hover {
-			background: rgba(128, 128, 128, 0.2);
-			border-color: rgba(128, 128, 128, 0.3);
+			background: var(--glass-overlay-hover);
+			border-color: var(--glass-border-hover);
 			transform: translateY(-1px);
 			box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 		}
@@ -111,8 +167,25 @@ class WebviewManager {
 		}
 		
 		.btn-small {
-			padding: 6px 10px;
+			padding: var(--button-padding-small);
 			font-size: 11px;
+		}
+		
+		/* =================================================================
+		   UTILITY COMPONENTS
+		   ================================================================= */
+		
+		.zoom-indicator {
+			font-size: 11px;
+			color: var(--text-primary);
+			background: var(--glass-overlay);
+			backdrop-filter: blur(8px);
+			border: 1px solid var(--glass-border);
+			padding: var(--spacing-xs) var(--spacing-sm);
+			border-radius: var(--border-radius-medium);
+			margin-right: var(--spacing-md);
+			font-family: monospace;
+			font-weight: 500;
 		}
 		
 		.status-indicator {
@@ -120,27 +193,27 @@ class WebviewManager {
 			color: var(--text-secondary);
 			display: flex;
 			align-items: center;
-			gap: 6px;
-			padding: 4px 8px;
+			gap: var(--spacing-sm);
+			padding: var(--spacing-xs) var(--spacing-sm);
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
-			border-radius: 4px;
+			border-radius: var(--border-radius-small);
 			border: 1px solid var(--glass-border);
 		}
 		
 		.auto-refresh-toggle {
 			display: flex;
 			align-items: center;
-			gap: 6px;
+			gap: var(--spacing-sm);
 			font-size: 11px;
 			color: var(--text-secondary);
 			cursor: pointer;
-			padding: 4px 8px;
+			padding: var(--spacing-xs) var(--spacing-sm);
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
-			border-radius: 4px;
+			border-radius: var(--border-radius-small);
 			border: 1px solid var(--glass-border);
-			transition: all 0.2s ease;
+			transition: all var(--transition-normal);
 		}
 		
 		.auto-refresh-toggle:hover {
@@ -151,6 +224,10 @@ class WebviewManager {
 			margin: 0;
 			accent-color: var(--primary-accent);
 		}
+		
+		/* =================================================================
+		   DIAGRAM AREA
+		   ================================================================= */
 		
 		.flowchart-container {
 			flex: 1;
@@ -169,8 +246,8 @@ class WebviewManager {
 			position: relative;
 			min-height: 400px;
 			border: 1px solid var(--border-subtle);
-			margin: 8px;
-			border-radius: 8px;
+			margin: var(--spacing-sm);
+			border-radius: var(--border-radius-large);
 			cursor: grab;
 		}
 		
@@ -181,25 +258,21 @@ class WebviewManager {
 		#mermaid-diagram {
 			max-width: none;
 			max-height: none;
-			transition: transform 0.1s ease;
+			transition: transform var(--transition-fast);
 			transform-origin: center center;
 			cursor: inherit;
 			user-select: none;
 		}
 		
-		/* Professional semitransparent styling for Mermaid diagrams */
+		/* =================================================================
+		   MERMAID DIAGRAM STYLING - CENTRALIZED
+		   ================================================================= */
+		
+		/* Text Elements */
 		#mermaid-diagram svg text,
 		#mermaid-diagram svg .nodeLabel,
 		#mermaid-diagram svg .edgeLabel,
-		#mermaid-diagram svg .label {
-			font-family: 'Segoe UI', system-ui, sans-serif !important;
-			font-weight: 500 !important;
-			font-size: 14px !important;
-			fill: rgba(255, 255, 255, 0.95) !important;
-		}
-		
-		/* Comprehensive text visibility for dark mode - target all possible text elements */
-		#mermaid-diagram svg text,
+		#mermaid-diagram svg .label,
 		#mermaid-diagram svg .nodeLabel text,
 		#mermaid-diagram svg .edgeLabel text,
 		#mermaid-diagram svg .cluster text,
@@ -213,34 +286,38 @@ class WebviewManager {
 		#mermaid-diagram svg foreignObject text,
 		#mermaid-diagram svg .flowchart text,
 		#mermaid-diagram svg .subgraph text {
-			fill: rgba(255, 255, 255, 0.95) !important;
-			color: rgba(255, 255, 255, 0.95) !important;
+			font-family: 'Segoe UI', system-ui, sans-serif !important;
+			font-weight: 500 !important;
+			font-size: 14px !important;
+			fill: var(--mermaid-text) !important;
+			color: var(--mermaid-text) !important;
 			stroke: none !important;
 		}
 		
+		/* Edges */
 		#mermaid-diagram svg .edgePath .path {
 			stroke-width: 2px !important;
-			stroke: rgba(128, 128, 128, 0.8) !important;
+			stroke: var(--mermaid-edge) !important;
 		}
 		
-		/* Edge labels with transparent backgrounds */
+		/* Edge Labels */
 		#mermaid-diagram svg .edgeLabel rect,
 		#mermaid-diagram svg .edgeLabel .label-container {
-			fill: rgba(128, 128, 128, 0.1) !important;
-			stroke: rgba(128, 128, 128, 0.3) !important;
+			fill: var(--glass-overlay) !important;
+			stroke: var(--glass-border-hover) !important;
 			stroke-width: 1px !important;
 		}
 		
-		/* Semitransparent subgraph styling */
+		/* Subgraphs/Clusters */
 		#mermaid-diagram svg .cluster rect {
 			rx: 4px !important;
 			ry: 4px !important;
-			fill: rgba(128, 128, 128, 0.12) !important;
-			stroke: rgba(128, 128, 128, 0.4) !important;
+			fill: var(--mermaid-cluster-bg) !important;
+			stroke: var(--mermaid-cluster-border) !important;
 			stroke-width: 2px !important;
 		}
 		
-		/* Node styling with transparency - no white backgrounds */
+		/* Nodes */
 		#mermaid-diagram svg .node rect,
 		#mermaid-diagram svg .node circle,
 		#mermaid-diagram svg .node polygon,
@@ -249,17 +326,21 @@ class WebviewManager {
 		#mermaid-diagram svg .label rect,
 		#mermaid-diagram svg .node .label-container,
 		#mermaid-diagram svg .flowchart-label rect {
-			fill: rgba(128, 128, 128, 0.15) !important;
-			stroke: rgba(128, 128, 128, 0.6) !important;
+			fill: var(--mermaid-node-bg) !important;
+			stroke: var(--mermaid-node-border) !important;
 			stroke-width: 2px !important;
 		}
 		
-		/* Specifically target any white backgrounds */
+		/* Override any white backgrounds */
 		#mermaid-diagram svg [fill="#ffffff"],
 		#mermaid-diagram svg [fill="white"],
 		#mermaid-diagram svg [fill="rgb(255,255,255)"] {
-			fill: rgba(128, 128, 128, 0.15) !important;
+			fill: var(--mermaid-node-bg) !important;
 		}
+		
+		/* =================================================================
+		   LOADING & ERROR STATES
+		   ================================================================= */
 		
 		.loading-overlay {
 			position: absolute;
@@ -296,9 +377,37 @@ class WebviewManager {
 		}
 		
 		.loading-text {
-			color: var(--vscode-descriptionForeground);
+			color: var(--text-secondary);
 			text-align: center;
 		}
+		
+		.error-message {
+			color: var(--vscode-errorForeground);
+			background: var(--vscode-inputValidation-errorBackground);
+			border: 1px solid var(--vscode-inputValidation-errorBorder);
+			padding: 15px;
+			border-radius: var(--border-radius-small);
+			margin: var(--spacing-xl);
+		}
+
+		.pan-hint {
+			position: absolute;
+			bottom: var(--spacing-lg);
+			left: var(--spacing-lg);
+			font-size: 11px;
+			color: var(--text-secondary);
+			background: var(--glass-overlay);
+			backdrop-filter: blur(8px);
+			padding: var(--spacing-sm) var(--spacing-md);
+			border-radius: var(--border-radius-medium);
+			border: 1px solid var(--glass-border);
+			opacity: 0.7;
+			pointer-events: none;
+		}
+		
+		/* =================================================================
+		   DETAILS PANEL
+		   ================================================================= */
 		
 		.details-panel {
 			background: var(--surface-primary);
@@ -311,7 +420,7 @@ class WebviewManager {
 			width: 100%;
 			background: transparent;
 			border: none;
-			padding: 16px 24px;
+			padding: var(--spacing-lg) var(--spacing-xxl);
 			color: var(--text-primary);
 			cursor: pointer;
 			display: flex;
@@ -320,7 +429,7 @@ class WebviewManager {
 			font-size: 13px;
 			font-weight: 500;
 			border-bottom: 1px solid var(--border-subtle);
-			transition: background-color 0.2s ease;
+			transition: background-color var(--transition-normal);
 		}
 		
 		.details-toggle:hover {
@@ -330,7 +439,7 @@ class WebviewManager {
 		.details-content {
 			max-height: 0;
 			overflow: hidden;
-			transition: max-height 0.3s ease;
+			transition: max-height var(--transition-slow);
 			position: relative;
 		}
 		
@@ -340,24 +449,28 @@ class WebviewManager {
 		}
 		
 		.details-inner {
-			padding: 24px;
+			padding: var(--spacing-xxl);
 		}
+		
+		/* =================================================================
+		   STATS CARDS
+		   ================================================================= */
 		
 		.stats-grid {
 			display: grid;
 			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 			gap: 15px;
-			margin-bottom: 20px;
+			margin-bottom: var(--spacing-xl);
 		}
 		
 		.stat-card {
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
-			padding: 16px;
-			border-radius: 8px;
+			padding: var(--spacing-lg);
+			border-radius: var(--border-radius-large);
 			text-align: center;
 			border: 1px solid var(--glass-border);
-			transition: transform 0.2s ease;
+			transition: transform var(--transition-normal);
 		}
 		
 		.stat-card:hover {
@@ -369,7 +482,7 @@ class WebviewManager {
 			font-size: 1.8em;
 			font-weight: 600;
 			color: var(--primary-accent);
-			margin-bottom: 4px;
+			margin-bottom: var(--spacing-xs);
 		}
 		
 		.stat-label {
@@ -378,25 +491,29 @@ class WebviewManager {
 			font-weight: 500;
 		}
 		
+		/* =================================================================
+		   TABS SYSTEM
+		   ================================================================= */
+		
 		.tabs {
 			display: flex;
 			border-bottom: 1px solid var(--border-subtle);
-			margin-bottom: 20px;
+			margin-bottom: var(--spacing-xl);
 			background: var(--glass-overlay);
-			border-radius: 8px 8px 0 0;
+			border-radius: var(--border-radius-large) var(--border-radius-large) 0 0;
 			backdrop-filter: blur(8px);
 		}
 		
 		.tab {
 			background: transparent;
 			border: none;
-			padding: 12px 20px;
+			padding: var(--spacing-md) var(--spacing-xl);
 			cursor: pointer;
 			color: var(--text-secondary);
 			border-bottom: 2px solid transparent;
 			font-size: 12px;
 			font-weight: 500;
-			transition: all 0.2s ease;
+			transition: all var(--transition-normal);
 		}
 		
 		.tab:hover {
@@ -418,13 +535,17 @@ class WebviewManager {
 			display: block;
 		}
 		
+		/* =================================================================
+		   CODE BLOCKS & FILE TREE
+		   ================================================================= */
+		
 		.code-block {
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
 			border: 1px solid var(--glass-border);
 			border-left: 3px solid var(--primary-accent);
-			padding: 16px;
-			border-radius: 6px;
+			padding: var(--spacing-lg);
+			border-radius: var(--border-radius-medium);
 			font-family: var(--vscode-editor-font-family);
 			font-size: 11px;
 			white-space: pre-wrap;
@@ -439,8 +560,8 @@ class WebviewManager {
 			font-size: 11px;
 			background: var(--glass-overlay);
 			backdrop-filter: blur(8px);
-			padding: 16px;
-			border-radius: 6px;
+			padding: var(--spacing-lg);
+			border-radius: var(--border-radius-medium);
 			border: 1px solid var(--glass-border);
 			max-height: 200px;
 			overflow-y: auto;
@@ -460,30 +581,6 @@ class WebviewManager {
 		.tree-file {
 			color: var(--text-primary);
 		}
-		
-		.error-message {
-			color: var(--vscode-errorForeground);
-			background: var(--vscode-inputValidation-errorBackground);
-			border: 1px solid var(--vscode-inputValidation-errorBorder);
-			padding: 15px;
-			border-radius: 4px;
-			margin: 20px;
-		}
-
-		.pan-hint {
-			position: absolute;
-			bottom: 16px;
-			left: 16px;
-			font-size: 11px;
-			color: var(--text-secondary);
-			background: var(--glass-overlay);
-			backdrop-filter: blur(8px);
-			padding: 8px 12px;
-			border-radius: 6px;
-			border: 1px solid var(--glass-border);
-			opacity: 0.7;
-			pointer-events: none;
-		}
 	</style>
 </head>
 <body>
@@ -502,7 +599,7 @@ class WebviewManager {
 				<button class="btn btn-small" id="refreshBtn" onclick="regenerateFlowchart()">
 					Refresh
 				</button>
-				<button class="btn btn-small" onclick="generateFunctionChart()" title="Generate detailed function-only flowchart">
+				<button class="btn btn-small" id="analysisToggleBtn" onclick="toggleAnalysisMode()" title="Switch between repository and function analysis">
 					Function Analysis
 				</button>
 				<button class="btn btn-small" onclick="copyMermaidCode()">
@@ -580,36 +677,45 @@ class WebviewManager {
 		let isDragging = false;
 		let lastMouseX = 0;
 		let lastMouseY = 0;
+		let currentViewMode = 'repository'; // 'repository' or 'function'
+		let currentFunctionAnalysis = null;
 		
 		document.addEventListener('DOMContentLoaded', () => {
+			// Get CSS variables for consistent theming
+			const rootStyles = getComputedStyle(document.documentElement);
+			const getMermaidColor = (cssVar) => rootStyles.getPropertyValue(cssVar).trim();
+			
 			mermaid.initialize({ 
 				startOnLoad: false,
 				theme: 'base',
 				themeVariables: {
-					// Dark mode optimized semitransparent color scheme
-					primaryColor: 'rgba(128, 128, 128, 0.15)',
-					primaryTextColor: 'rgba(255, 255, 255, 0.9)',
-					primaryBorderColor: 'rgba(128, 128, 128, 0.6)',
-					lineColor: 'rgba(128, 128, 128, 0.8)',
-					secondaryColor: 'rgba(112, 112, 112, 0.12)',
-					tertiaryColor: 'rgba(96, 96, 96, 0.1)',
+					// Use centralized color system
+					primaryColor: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
+					primaryTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
+					primaryBorderColor: getMermaidColor('--mermaid-node-border') || 'rgba(128, 128, 128, 0.6)',
+					lineColor: getMermaidColor('--mermaid-edge') || 'rgba(128, 128, 128, 0.8)',
+					secondaryColor: getMermaidColor('--mermaid-cluster-bg') || 'rgba(112, 112, 112, 0.12)',
+					tertiaryColor: getMermaidColor('--glass-overlay') || 'rgba(96, 96, 96, 0.1)',
 					background: 'transparent',
-					mainBkg: 'rgba(128, 128, 128, 0.15)',
-					secondBkg: 'rgba(112, 112, 112, 0.12)',
-					tertiaryTextColor: 'rgba(255, 255, 255, 0.8)',
-					labelTextColor: 'rgba(255, 255, 255, 0.9)',
-					textColor: 'rgba(255, 255, 255, 0.9)',
-					nodeTextColor: 'rgba(255, 255, 255, 0.9)',
-					nodeBkg: 'rgba(128, 128, 128, 0.15)',
-					edgeLabelBackground: 'rgba(128, 128, 128, 0.1)',
-					edgeLabelColor: 'rgba(255, 255, 255, 0.9)',
-					clusterBkg: 'rgba(128, 128, 128, 0.12)',
-					clusterBorder: 'rgba(128, 128, 128, 0.4)',
-					altBackground: 'rgba(96, 96, 96, 0.1)',
+					mainBkg: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
+					secondBkg: getMermaidColor('--mermaid-cluster-bg') || 'rgba(112, 112, 112, 0.12)',
+					tertiaryTextColor: getMermaidColor('--text-muted') || 'rgba(200, 200, 200, 0.8)',
+					labelTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
+					textColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
+					nodeTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
+					nodeBkg: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
+					edgeLabelBackground: getMermaidColor('--glass-overlay') || 'rgba(128, 128, 128, 0.1)',
+					edgeLabelColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
+					clusterBkg: getMermaidColor('--mermaid-cluster-bg') || 'rgba(128, 128, 128, 0.12)',
+					clusterBorder: getMermaidColor('--mermaid-cluster-border') || 'rgba(128, 128, 128, 0.4)',
+					altBackground: getMermaidColor('--glass-overlay') || 'rgba(96, 96, 96, 0.1)',
 					fontFamily: 'Segoe UI, system-ui, sans-serif',
 					fontSize: '14px'
 				}
 			});
+			
+			// Initialize button state
+			updateAnalysisButton();
 			
 			setTimeout(autoStartAnalysis, 500);
 			setupZoomAndPanControls();
@@ -634,6 +740,35 @@ class WebviewManager {
 			updateStatus('Analyzing functions...', 'generating');
 			showLoading();
 			vscode.postMessage({ command: 'generateFunctionFlowchart', data: {} });
+		}
+
+		function toggleAnalysisMode() {
+			if (currentViewMode === 'repository') {
+				// Switch to function analysis
+				updateStatus('Analyzing functions...', 'generating');
+				showLoading();
+				vscode.postMessage({ command: 'generateFunctionFlowchart', data: {} });
+			} else {
+				// Switch back to repository analysis
+				if (currentAnalysis) {
+					updateStatus('Generating repository flowchart...', 'generating');
+					showLoading();
+					vscode.postMessage({ command: 'generateFlowchart', data: currentAnalysis });
+				} else {
+					autoStartAnalysis();
+				}
+			}
+		}
+
+		function updateAnalysisButton() {
+			const button = document.getElementById('analysisToggleBtn');
+			if (currentViewMode === 'repository') {
+				button.textContent = 'Function Analysis';
+				button.title = 'Switch to detailed function-level analysis';
+			} else {
+				button.textContent = 'Repository Analysis';
+				button.title = 'Switch back to repository structure analysis';
+			}
 		}
 
 		function updateStatus(text, state) {
@@ -795,25 +930,56 @@ class WebviewManager {
 			vscode.postMessage({ command: 'toggleAutoRefresh', enabled: checkbox.checked });
 		}
 
-		function renderStats(stats) {
-			const statsHtml = \`
-				<div class="stat-card">
-					<div class="stat-number">\${stats.totalFiles}</div>
-					<div class="stat-label">Files</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-number">\${stats.totalDirectories}</div>
-					<div class="stat-label">Directories</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-number">\${stats.totalLines.toLocaleString()}</div>
-					<div class="stat-label">Lines of Code</div>
-				</div>
-				<div class="stat-card">
-					<div class="stat-number">\${Object.keys(stats.fileTypes).length}</div>
-					<div class="stat-label">File Types</div>
-				</div>
-			\`;
+		function renderStats(stats, functionAnalysis = null) {
+			let statsHtml = '';
+			
+			if (currentViewMode === 'function' && functionAnalysis) {
+				// Function analysis stats
+				const metadata = functionAnalysis.metadata || {};
+				const functions = functionAnalysis.functions || [];
+				const importantFunctions = functions.filter(f => f.importance > 5);
+				const entryPoints = functions.filter(f => f.isEntryPoint);
+				
+				statsHtml = \`
+					<div class="stat-card">
+						<div class="stat-number">\${metadata.totalFunctions || 0}</div>
+						<div class="stat-label">Total Functions</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${importantFunctions.length}</div>
+						<div class="stat-label">Important Functions</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${entryPoints.length}</div>
+						<div class="stat-label">Entry Points</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${metadata.totalClasses || 0}</div>
+						<div class="stat-label">Classes</div>
+					</div>
+				\`;
+			} else {
+				// Repository analysis stats
+				statsHtml = \`
+					<div class="stat-card">
+						<div class="stat-number">\${stats.totalFiles}</div>
+						<div class="stat-label">Files</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${stats.totalDirectories}</div>
+						<div class="stat-label">Directories</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${stats.totalLines.toLocaleString()}</div>
+						<div class="stat-label">Lines of Code</div>
+					</div>
+					<div class="stat-card">
+						<div class="stat-number">\${Object.keys(stats.fileTypes).length}</div>
+						<div class="stat-label">File Types</div>
+					</div>
+				\`;
+			}
+			
 			document.getElementById('stats').innerHTML = statsHtml;
 		}
 
@@ -850,15 +1016,27 @@ class WebviewManager {
 					document.getElementById('claudePrompt').textContent = message.data.claudePrompt;
 					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
 					updateStatus('Generated successfully', 'completed');
+					currentViewMode = 'repository';
+					document.querySelector('.header h1').textContent = 'GraphIt - Repository Analysis';
+					updateAnalysisButton();
+					// Re-render repository stats
+					if (currentAnalysis && currentAnalysis.stats) {
+						renderStats(currentAnalysis.stats);
+					}
 					renderMermaidDiagram(message.data.mermaidCode);
 					break;
 
 				case 'functionFlowchartGenerated':
 					currentMermaidCode = message.data.mermaidCode;
+					currentFunctionAnalysis = message.data.functionAnalysis;
 					document.getElementById('claudePrompt').textContent = message.data.claudePrompt;
 					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
 					updateStatus('Function analysis completed', 'completed');
+					currentViewMode = 'function';
 					document.querySelector('.header h1').textContent = 'GraphIt - Function Level Analysis';
+					updateAnalysisButton();
+					// Render function analysis stats
+					renderStats(currentAnalysis?.stats || {}, currentFunctionAnalysis);
 					renderMermaidDiagram(message.data.mermaidCode);
 					break;
 					
