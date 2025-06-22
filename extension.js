@@ -501,6 +501,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			display: flex;
 			flex-direction: column;
 			height: 100vh;
+			min-height: 600px;
 		}
 		
 		.header {
@@ -715,10 +716,11 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			max-height: 0;
 			overflow: hidden;
 			transition: max-height 0.3s ease;
+			position: relative;
 		}
 		
 		.details-content.expanded {
-			max-height: 50vh;
+			max-height: calc(50vh - 60px);
 			overflow-y: auto;
 		}
 		
@@ -763,12 +765,13 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			display: flex;
 			border-bottom: 1px solid var(--border-subtle);
 			margin-bottom: 20px;
-			background: var(--surface-secondary);
+			background: rgba(45, 45, 48, 0.6);
 			border-radius: 8px 8px 0 0;
+			backdrop-filter: blur(8px);
 		}
 		
 		.tab {
-			background: transparent;
+			background: rgba(255, 255, 255, 0.05);
 			border: none;
 			padding: 12px 20px;
 			cursor: pointer;
@@ -777,17 +780,18 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			font-size: 12px;
 			font-weight: 500;
 			transition: all 0.2s ease;
+			backdrop-filter: blur(4px);
 		}
 		
 		.tab:hover {
 			color: var(--text-primary);
-			background: var(--surface-primary);
+			background: rgba(255, 255, 255, 0.1);
 		}
 		
 		.tab.active {
 			color: var(--primary-accent);
 			border-bottom-color: var(--primary-accent);
-			background: var(--surface-primary);
+			background: rgba(0, 120, 212, 0.2);
 		}
 		
 		.tab-content {
@@ -847,12 +851,42 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			border-radius: 4px;
 			margin: 20px;
 		}
+		
+		/* Responsive design for different VS Code panel sizes */
+		@media (max-height: 600px) {
+			.details-content.expanded {
+				max-height: 200px !important;
+			}
+			
+			.header {
+				padding: 12px 16px;
+			}
+			
+			.btn-small {
+				padding: 4px 8px;
+				font-size: 10px;
+			}
+		}
+		
+		@media (max-height: 400px) {
+			.details-content.expanded {
+				max-height: 150px !important;
+			}
+			
+			.stat-card {
+				padding: 8px;
+			}
+			
+			.tabs {
+				margin-bottom: 10px;
+			}
+		}
 	</style>
 </head>
 <body>
 	<div class="main-container">
 		<div class="header">
-			<h1>🔗 GraphIt</h1>
+			<h1>GraphIt</h1>
 			<div class="header-controls">
 				<span class="zoom-indicator" id="zoomIndicator">200%</span>
 				<div class="status-indicator" id="statusIndicator">
@@ -941,7 +975,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		let lastMouseX = 0;
 		let lastMouseY = 0;
 		
-		// Initialize Mermaid
+		// Initialize Mermaid and responsive handling
 		document.addEventListener('DOMContentLoaded', () => {
 			mermaid.initialize({ 
 				startOnLoad: false,
@@ -975,6 +1009,9 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			
 			// Setup zoom event listeners
 			setupZoomControls();
+			
+			// Setup responsive handling
+			setupResponsiveHandling();
 		});
 
 		function autoStartAnalysis() {
@@ -1192,6 +1229,11 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			if (detailsExpanded) {
 				content.classList.add('expanded');
 				icon.textContent = '▼';
+				// Trigger responsive adjustment
+				setTimeout(() => {
+					const event = new Event('resize');
+					window.dispatchEvent(event);
+				}, 50);
 			} else {
 				content.classList.remove('expanded');
 				icon.textContent = '▲';
@@ -1260,6 +1302,40 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			} else {
 				console.log('Auto-refresh disabled');
 			}
+		}
+
+		function setupResponsiveHandling() {
+			function adjustDetailsPanel() {
+				const detailsContent = document.getElementById('detailsContent');
+				const mainContainer = document.querySelector('.main-container');
+				
+				if (detailsContent && mainContainer) {
+					const containerHeight = mainContainer.clientHeight;
+					const headerHeight = document.querySelector('.header').clientHeight;
+					const diagramMinHeight = 300; // Minimum height for diagram
+					const availableHeight = containerHeight - headerHeight - diagramMinHeight;
+					
+					// Ensure details panel doesn't take more than 40% of available space
+					const maxDetailsHeight = Math.max(200, availableHeight * 0.4);
+					detailsContent.style.maxHeight = detailsExpanded ? \`\${maxDetailsHeight}px\` : '0px';
+				}
+			}
+
+			// Handle window resize
+			window.addEventListener('resize', adjustDetailsPanel);
+			
+			// Handle VS Code panel resize
+			const resizeObserver = new ResizeObserver(() => {
+				adjustDetailsPanel();
+			});
+			
+			const mainContainer = document.querySelector('.main-container');
+			if (mainContainer) {
+				resizeObserver.observe(mainContainer);
+			}
+			
+			// Initial adjustment
+			setTimeout(adjustDetailsPanel, 100);
 		}
 
 		function renderStats(stats) {
