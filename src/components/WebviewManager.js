@@ -195,17 +195,27 @@ class WebviewManager {
 			font-family: 'Segoe UI', system-ui, sans-serif !important;
 			font-weight: 500 !important;
 			font-size: 14px !important;
-			fill: rgba(255, 255, 255, 0.9) !important;
+			fill: rgba(255, 255, 255, 0.95) !important;
 		}
 		
-		/* Ensure all text is visible in dark mode */
+		/* Comprehensive text visibility for dark mode - target all possible text elements */
+		#mermaid-diagram svg text,
 		#mermaid-diagram svg .nodeLabel text,
 		#mermaid-diagram svg .edgeLabel text,
 		#mermaid-diagram svg .cluster text,
 		#mermaid-diagram svg .titleText,
-		#mermaid-diagram svg .node text {
-			fill: rgba(255, 255, 255, 0.9) !important;
-			color: rgba(255, 255, 255, 0.9) !important;
+		#mermaid-diagram svg .node text,
+		#mermaid-diagram svg tspan,
+		#mermaid-diagram svg .label text,
+		#mermaid-diagram svg .edgeLabels text,
+		#mermaid-diagram svg .nodeLabels text,
+		#mermaid-diagram svg g text,
+		#mermaid-diagram svg foreignObject text,
+		#mermaid-diagram svg .flowchart text,
+		#mermaid-diagram svg .subgraph text {
+			fill: rgba(255, 255, 255, 0.95) !important;
+			color: rgba(255, 255, 255, 0.95) !important;
+			stroke: none !important;
 		}
 		
 		#mermaid-diagram svg .edgePath .path {
@@ -230,13 +240,25 @@ class WebviewManager {
 			stroke-width: 2px !important;
 		}
 		
-		/* Node styling with transparency */
+		/* Node styling with transparency - no white backgrounds */
 		#mermaid-diagram svg .node rect,
 		#mermaid-diagram svg .node circle,
-		#mermaid-diagram svg .node polygon {
+		#mermaid-diagram svg .node polygon,
+		#mermaid-diagram svg rect,
+		#mermaid-diagram svg .nodeLabel rect,
+		#mermaid-diagram svg .label rect,
+		#mermaid-diagram svg .node .label-container,
+		#mermaid-diagram svg .flowchart-label rect {
 			fill: rgba(128, 128, 128, 0.15) !important;
 			stroke: rgba(128, 128, 128, 0.6) !important;
 			stroke-width: 2px !important;
+		}
+		
+		/* Specifically target any white backgrounds */
+		#mermaid-diagram svg [fill="#ffffff"],
+		#mermaid-diagram svg [fill="white"],
+		#mermaid-diagram svg [fill="rgb(255,255,255)"] {
+			fill: rgba(128, 128, 128, 0.15) !important;
 		}
 		
 		.loading-overlay {
