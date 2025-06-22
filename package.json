@@ -32,6 +32,10 @@
       {
         "command": "graphit.showHelloSiliconCreature",
         "title": "GraphIt: Hello Silicon Creature"
+      },
+      {
+        "command": "graphit.configureApiKey",
+        "title": "GraphIt: Configure Anthropic API Key"
       }
     ],
     "keybindings": [

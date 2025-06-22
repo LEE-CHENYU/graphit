@@ -681,6 +681,56 @@ class WebviewManager {
 		.tree-file {
 			color: var(--text-primary);
 		}
+
+		/* =================================================================
+		   API STATUS COMPONENTS
+		   ================================================================= */
+		
+		.api-status-card {
+			background: var(--glass-overlay);
+			backdrop-filter: blur(8px);
+			border: 1px solid var(--glass-border);
+			border-radius: var(--border-radius-medium);
+			padding: var(--spacing-lg);
+		}
+
+		.api-status-indicator {
+			display: flex;
+			align-items: center;
+			gap: var(--spacing-md);
+			margin-bottom: var(--spacing-sm);
+		}
+
+		.api-status-indicator span:first-child {
+			font-size: 18px;
+		}
+
+		.api-status-indicator span:last-child {
+			font-weight: 500;
+			color: var(--text-primary);
+		}
+
+		.api-status-description {
+			color: var(--text-secondary);
+			font-size: 12px;
+			line-height: 1.4;
+		}
+
+		.api-status-configured {
+			border-color: rgba(34, 197, 94, 0.4);
+			background: rgba(34, 197, 94, 0.08);
+		}
+
+		.api-status-not-configured {
+			border-color: rgba(251, 191, 36, 0.4);
+			background: rgba(251, 191, 36, 0.08);
+		}
+
+		.api-actions {
+			display: flex;
+			align-items: center;
+			gap: var(--spacing-md);
+		}
 	</style>
 </head>
 <body>
@@ -710,6 +760,9 @@ class WebviewManager {
 				</button>
 				<button class="btn btn-small" onclick="resetZoom()" title="Reset to 200% zoom (double-click diagram)">
 					Reset View
+				</button>
+				<button class="btn btn-small" id="configApiBtn" onclick="configureApiKey()" title="Configure Anthropic API key for AI-powered flowcharts">
+					⚙️ API Key
 				</button>
 			</div>
 		</div>
@@ -742,6 +795,7 @@ class WebviewManager {
 						<button class="tab active" onclick="switchTab('structure')">Structure</button>
 						<button class="tab" onclick="switchTab('mermaid')">Mermaid Code</button>
 						<button class="tab" onclick="switchTab('claude')">Claude Prompt</button>
+						<button class="tab" onclick="switchTab('api')">API Settings</button>
 					</div>
 					
 					<div id="structure-tab" class="tab-content active">
@@ -760,6 +814,44 @@ class WebviewManager {
 						<button class="btn btn-small" onclick="copyPrompt()" style="margin-top: 10px;">
 							Copy Claude Prompt
 						</button>
+					</div>
+
+					<div id="api-tab" class="tab-content">
+						<div id="apiSettings">
+							<h3 style="margin-top: 0; margin-bottom: 15px; color: var(--text-primary);">Anthropic API Configuration</h3>
+							
+							<div id="apiStatus" class="api-status-card">
+								<div class="api-status-indicator">
+									<span id="apiStatusIcon">⚙️</span>
+									<span id="apiStatusText">Checking API status...</span>
+								</div>
+								<div class="api-status-description">
+									<p id="apiStatusDescription">Loading configuration...</p>
+								</div>
+							</div>
+
+							<div class="api-actions" style="margin-top: 15px;">
+								<button class="btn" onclick="configureApiKey()" style="margin-right: 10px;">
+									Configure API Key
+								</button>
+								<button class="btn btn-small" onclick="vscode.postMessage({ command: 'checkApiStatus' })">
+									Refresh Status
+								</button>
+							</div>
+
+							<div class="api-info" style="margin-top: 20px; padding: 15px; background: var(--glass-overlay); border-radius: var(--border-radius-medium); border: 1px solid var(--glass-border);">
+								<h4 style="margin-top: 0; margin-bottom: 10px; color: var(--text-primary);">Benefits of AI-Powered Flowcharts:</h4>
+								<ul style="margin: 0; padding-left: 20px; color: var(--text-secondary); font-size: 12px; line-height: 1.5;">
+									<li>Enhanced architectural insights</li>
+									<li>Intelligent component relationships</li>
+									<li>Professional-grade flowchart styling</li>
+									<li>Context-aware project analysis</li>
+								</ul>
+								<p style="margin-top: 10px; margin-bottom: 0; font-size: 11px; color: var(--text-muted);">
+									Get your API key from <a href="https://console.anthropic.com" style="color: var(--primary-accent); text-decoration: none;">console.anthropic.com</a>
+								</p>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -810,8 +902,9 @@ class WebviewManager {
 				}
 			});
 			
-			// Initialize button state
+			// Initialize button state and check API status
 			updateAnalysisButton();
+			vscode.postMessage({ command: 'checkApiStatus' });
 			
 			setTimeout(autoStartAnalysis, 500);
 			setupZoomAndPanControls();
@@ -1026,6 +1119,44 @@ class WebviewManager {
 			vscode.postMessage({ command: 'toggleAutoRefresh', enabled: checkbox.checked });
 		}
 
+		function configureApiKey() {
+			vscode.postMessage({ command: 'configureApiKey' });
+		}
+
+		function updateApiStatus(statusData) {
+			// Update header button
+			const button = document.getElementById('configApiBtn');
+			if (statusData.hasApiKey && statusData.isConfigured) {
+				button.textContent = '✅ API Key';
+				button.title = 'Anthropic API key configured - AI-powered flowcharts enabled';
+				button.style.background = 'rgba(34, 197, 94, 0.15)';
+				button.style.borderColor = 'rgba(34, 197, 94, 0.4)';
+			} else {
+				button.textContent = '⚙️ API Key';
+				button.title = 'Configure Anthropic API key for AI-powered flowcharts';
+				button.style.background = '';
+				button.style.borderColor = '';
+			}
+
+			// Update API settings tab
+			const apiStatusCard = document.getElementById('apiStatus');
+			const apiStatusIcon = document.getElementById('apiStatusIcon');
+			const apiStatusText = document.getElementById('apiStatusText');
+			const apiStatusDescription = document.getElementById('apiStatusDescription');
+
+			if (statusData.hasApiKey && statusData.isConfigured) {
+				apiStatusCard.className = 'api-status-card api-status-configured';
+				apiStatusIcon.textContent = '✅';
+				apiStatusText.textContent = 'API Key Configured';
+				apiStatusDescription.innerHTML = 'Your Anthropic API key is configured and ready. AI-powered flowcharts are enabled for enhanced analysis and beautiful diagrams.';
+			} else {
+				apiStatusCard.className = 'api-status-card api-status-not-configured';
+				apiStatusIcon.textContent = '⚠️';
+				apiStatusText.textContent = 'API Key Not Configured';
+				apiStatusDescription.innerHTML = 'Configure your Anthropic API key to unlock AI-powered flowcharts with enhanced architectural insights and professional styling.';
+			}
+		}
+
 		function renderStats(stats, functionAnalysis = null) {
 			let statsHtml = '';
 			
@@ -1138,6 +1269,22 @@ class WebviewManager {
 					
 				case 'autoRefreshStarted':
 					updateStatus('Auto-refreshing...', 'analyzing');
+					break;
+
+				case 'apiStatusUpdate':
+					updateApiStatus(message.data);
+					break;
+
+				case 'apiKeyConfigured':
+					if (message.data.success) {
+						// Show temporary success indicator
+						const button = document.getElementById('configApiBtn');
+						const originalText = button.textContent;
+						button.textContent = '✅ Saved!';
+						setTimeout(() => {
+							button.textContent = originalText;
+						}, 2000);
+					}
 					break;
 			}
 		});

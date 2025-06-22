@@ -7,9 +7,11 @@ const path = require('path');
 // Configuration and API client
 let anthropicClient = null;
 let config = null;
+let extensionPath = null;
 
 // Load configuration
-function loadConfig(extensionPath) {
+function loadConfig(extPath) {
+	extensionPath = extPath;
 	try {
 		const configPath = path.join(extensionPath, 'config.json');
 		if (fs.existsSync(configPath)) {
@@ -25,10 +27,117 @@ function loadConfig(extensionPath) {
 			}
 		} else {
 			console.log('GraphIt: No config.json found, using local generation only');
+			// Create default config
+			config = createDefaultConfig();
 		}
 	} catch (error) {
 		console.error('GraphIt: Error loading config:', error);
 		vscode.window.showWarningMessage('GraphIt: Could not load config.json. Using local generation only.');
+		config = createDefaultConfig();
+	}
+}
+
+// Create default configuration
+function createDefaultConfig() {
+	return {
+		anthropic: {
+			apiKey: '',
+			model: 'claude-3-5-sonnet-20241022',
+			maxTokens: 4000
+		},
+		flowchart: {
+			enableClaudeGeneration: true,
+			fallbackToLocal: true,
+			timeout: 30000
+		}
+	};
+}
+
+// Save configuration to file
+function saveConfig() {
+	if (!extensionPath || !config) return false;
+	
+	try {
+		const configPath = path.join(extensionPath, 'config.json');
+		fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+		console.log('GraphIt: Configuration saved successfully');
+		return true;
+	} catch (error) {
+		console.error('GraphIt: Error saving config:', error);
+		vscode.window.showErrorMessage('Failed to save configuration: ' + error.message);
+		return false;
+	}
+}
+
+// Initialize or reinitialize Anthropic client
+function initializeAnthropicClient() {
+	if (config?.anthropic?.apiKey && config.anthropic.apiKey !== 'YOUR_ANTHROPIC_API_KEY_HERE' && config.anthropic.apiKey.trim() !== '') {
+		try {
+			const Anthropic = require('@anthropic-ai/sdk').default;
+			anthropicClient = new Anthropic({
+				apiKey: config.anthropic.apiKey,
+			});
+			console.log('GraphIt: Anthropic client initialized successfully');
+			return true;
+		} catch (error) {
+			console.error('GraphIt: Error initializing Anthropic client:', error);
+			anthropicClient = null;
+			return false;
+		}
+	} else {
+		anthropicClient = null;
+		return false;
+	}
+}
+
+// Configure API Key command handler
+async function configureApiKey() {
+	const currentKey = config?.anthropic?.apiKey || '';
+	const placeholder = currentKey && currentKey !== 'YOUR_ANTHROPIC_API_KEY_HERE' 
+		? '••••••••••••••••••••••••••••••••••••••••' 
+		: 'Enter your Anthropic API key';
+	
+	const apiKey = await vscode.window.showInputBox({
+		prompt: 'Enter your Anthropic API key for enhanced AI-powered flowcharts',
+		placeHolder: placeholder,
+		password: true,
+		ignoreFocusOut: true,
+		validateInput: (value) => {
+			if (!value || value.trim() === '') {
+				return 'API key cannot be empty';
+			}
+			if (!value.startsWith('sk-ant-')) {
+				return 'Invalid API key format. Anthropic API keys start with "sk-ant-"';
+			}
+			return null;
+		}
+	});
+
+	if (apiKey) {
+		// Update config
+		if (!config) config = createDefaultConfig();
+		config.anthropic.apiKey = apiKey.trim();
+		
+		// Save configuration
+		if (saveConfig()) {
+			// Initialize client
+			const success = initializeAnthropicClient();
+			if (success) {
+				vscode.window.showInformationMessage('✅ Anthropic API key configured successfully! AI-powered flowcharts are now enabled.');
+			} else {
+				vscode.window.showWarningMessage('⚠️ API key saved but failed to initialize client. Please check your key and try again.');
+			}
+			
+			// Refresh any open GraphIt panels
+			if (GraphItPanel.currentPanel) {
+				GraphItPanel.currentPanel.updateApiStatus();
+				// Send success message to webview
+				GraphItPanel.currentPanel.panel.webview.postMessage({
+					command: 'apiKeyConfigured',
+					data: { success: true }
+				});
+			}
+		}
 	}
 }
 
@@ -67,6 +176,9 @@ class GraphItPanel {
 		
 		this.setupGitWatcher();
 		this.setupMessageHandlers();
+		
+		// Send initial API status
+		setTimeout(() => this.sendApiStatus(), 100);
 	}
 
 	static createOrShow(extensionUri) {
@@ -111,11 +223,34 @@ class GraphItPanel {
 					case 'updateIncrementalChanges':
 						await this.handleIncrementalFlowchartUpdate(message.data);
 						break;
+					case 'configureApiKey':
+						await configureApiKey();
+						break;
+					case 'checkApiStatus':
+						this.sendApiStatus();
+						break;
 				}
 			},
 			null,
 			this.disposables
 		);
+	}
+
+	sendApiStatus() {
+		this.panel.webview.postMessage({
+			command: 'apiStatusUpdate',
+			data: {
+				hasApiKey: !!anthropicClient,
+				isConfigured: !!(config?.anthropic?.apiKey && config.anthropic.apiKey !== 'YOUR_ANTHROPIC_API_KEY_HERE' && config.anthropic.apiKey.trim() !== ''),
+				enableClaudeGeneration: config?.flowchart?.enableClaudeGeneration || false
+			}
+		});
+	}
+
+	updateApiStatus() {
+		// Reinitialize components with new config
+		this.flowchartGenerator = new Components.FlowchartGenerator(anthropicClient, config);
+		this.sendApiStatus();
 	}
 
 	async handleAnalyzeRepository() {
@@ -496,7 +631,12 @@ function activate(context) {
 			vscode.window.showInformationMessage('Hello Silicon Creature! 🤖✨ Welcome to the digital realm!');
 		});
 
-		context.subscriptions.push(helloWorldDisposable, showFlowchartDisposable, showHelloSiliconCreatureDisposable);
+		const configureApiKeyDisposable = vscode.commands.registerCommand('graphit.configureApiKey', function () {
+			console.log('GraphIt: Configure API Key command triggered!');
+			configureApiKey();
+		});
+
+		context.subscriptions.push(helloWorldDisposable, showFlowchartDisposable, showHelloSiliconCreatureDisposable, configureApiKeyDisposable);
 		
 		console.log('GraphIt Extension: Successfully activated! Commands registered.');
 		
