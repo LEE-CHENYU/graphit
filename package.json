@@ -28,6 +28,16 @@
         "command": "graphit.showHelloSiliconCreature",
         "title": "GraphIt: Hello Silicon Creature"
       }
+    ],
+    "keybindings": [
+      {
+        "command": "graphit.showRepoFlowchart",
+        "key": "cmd+g cmd+g",
+        "mac": "cmd+g cmd+g",
+        "win": "ctrl+g ctrl+g",
+        "linux": "ctrl+g ctrl+g",
+        "when": "editorTextFocus || !inputFocus"
+      }
     ]
   },
   "scripts": {

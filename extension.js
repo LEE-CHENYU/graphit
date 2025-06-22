@@ -576,8 +576,17 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		#mermaid-diagram {
 			max-width: 100%;
 			max-height: 100%;
-			transition: transform 0.2s ease;
+			transition: transform 0.1s ease;
 			transform-origin: center center;
+			cursor: grab;
+		}
+		
+		#mermaid-diagram.zoomed {
+			cursor: grab;
+		}
+		
+		#mermaid-diagram.dragging {
+			cursor: grabbing;
 		}
 		
 		.loading-overlay {
@@ -765,7 +774,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		<div class="header">
 			<h1>🔗 GraphIt</h1>
 			<div class="header-controls">
-				<span class="zoom-indicator" id="zoomIndicator">100%</span>
+				<span class="zoom-indicator" id="zoomIndicator">200%</span>
 				<div class="status-indicator" id="statusIndicator">
 					<span>🔄 Initializing...</span>
 				</div>
@@ -778,7 +787,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				<button class="btn btn-small" onclick="downloadSVG()">
 					⬇️ Download SVG
 				</button>
-				<button class="btn btn-small" onclick="resetZoom()" title="Reset zoom (double-click diagram)">
+				<button class="btn btn-small" onclick="resetZoom()" title="Reset to 200% zoom (double-click diagram)">
 					⌂ Reset
 				</button>
 			</div>
@@ -840,8 +849,13 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		let currentAnalysis = null;
 		let currentMermaidCode = null;
 		let detailsExpanded = false;
-		let currentZoom = 1.0;
+		let currentZoom = 2.0; // Start at 200% zoom
+		let panX = 0;
+		let panY = 0;
 		let initialTouchDistance = 0;
+		let isDragging = false;
+		let lastMouseX = 0;
+		let lastMouseY = 0;
 		
 		// Initialize Mermaid
 		document.addEventListener('DOMContentLoaded', () => {
@@ -927,16 +941,50 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		function setupZoomControls() {
 			const diagramViewport = document.querySelector('.diagram-viewport');
 			
-			// Mouse wheel zoom
+			// Mouse wheel zoom (faster sensitivity)
 			diagramViewport.addEventListener('wheel', (e) => {
 				e.preventDefault();
 				
-				const zoomSensitivity = 0.001;
+				const zoomSensitivity = 0.005; // Even faster zoom for better responsiveness
 				const zoomDirection = e.deltaY > 0 ? -1 : 1;
 				const zoomFactor = 1 + (zoomDirection * zoomSensitivity * Math.abs(e.deltaY));
 				
 				currentZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 3.0);
-				applyZoom();
+				applyTransform();
+			});
+			
+			// Mouse drag to pan
+			diagramViewport.addEventListener('mousedown', (e) => {
+				if (currentZoom > 1.0) { // Allow panning when zoomed beyond 100%
+					isDragging = true;
+					lastMouseX = e.clientX;
+					lastMouseY = e.clientY;
+					document.getElementById('mermaid-diagram').classList.add('dragging');
+					e.preventDefault();
+				}
+			});
+			
+			document.addEventListener('mousemove', (e) => {
+				if (isDragging && currentZoom > 1.0) {
+					const deltaX = e.clientX - lastMouseX;
+					const deltaY = e.clientY - lastMouseY;
+					
+					panX += deltaX;
+					panY += deltaY;
+					
+					lastMouseX = e.clientX;
+					lastMouseY = e.clientY;
+					
+					applyTransform();
+					e.preventDefault();
+				}
+			});
+			
+			document.addEventListener('mouseup', () => {
+				if (isDragging) {
+					isDragging = false;
+					document.getElementById('mermaid-diagram').classList.remove('dragging');
+				}
 			});
 			
 			// Touch pinch-to-zoom
@@ -944,6 +992,11 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				if (e.touches.length === 2) {
 					e.preventDefault();
 					initialTouchDistance = getTouchDistance(e.touches);
+				} else if (e.touches.length === 1 && currentZoom > 1.0) {
+					// Single touch pan
+					isDragging = true;
+					lastMouseX = e.touches[0].clientX;
+					lastMouseY = e.touches[0].clientY;
 				}
 			});
 			
@@ -954,15 +1007,31 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					const scaleFactor = currentDistance / initialTouchDistance;
 					
 					currentZoom = Math.min(Math.max(currentZoom * scaleFactor, 0.2), 3.0);
-					applyZoom();
+					applyTransform();
 					
 					initialTouchDistance = currentDistance;
+				} else if (e.touches.length === 1 && isDragging && currentZoom > 1.0) {
+					e.preventDefault();
+					const deltaX = e.touches[0].clientX - lastMouseX;
+					const deltaY = e.touches[0].clientY - lastMouseY;
+					
+					panX += deltaX;
+					panY += deltaY;
+					
+					lastMouseX = e.touches[0].clientX;
+					lastMouseY = e.touches[0].clientY;
+					
+					applyTransform();
 				}
 			});
 			
-			// Double-click to reset zoom
+			diagramViewport.addEventListener('touchend', () => {
+				isDragging = false;
+			});
+			
+			// Double-click to reset zoom and pan
 			diagramViewport.addEventListener('dblclick', () => {
-				resetZoom();
+				resetZoomAndPan();
 			});
 		}
 
@@ -972,14 +1041,27 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			return Math.sqrt(dx * dx + dy * dy);
 		}
 
-		function resetZoom() {
-			currentZoom = 1.0;
-			applyZoom();
+		function resetZoomAndPan() {
+			currentZoom = 2.0; // Reset to 200% default zoom
+			panX = 0;
+			panY = 0;
+			applyTransform();
 		}
 
-		function applyZoom() {
+		function resetZoom() {
+			resetZoomAndPan();
+		}
+
+		function applyTransform() {
 			const diagram = document.getElementById('mermaid-diagram');
-			diagram.style.transform = \`scale(\${currentZoom})\`;
+			diagram.style.transform = \`translate(\${panX}px, \${panY}px) scale(\${currentZoom})\`;
+			
+			// Update cursor based on zoom level
+			if (currentZoom > 1.0) {
+				diagram.classList.add('zoomed');
+			} else {
+				diagram.classList.remove('zoomed');
+			}
 			
 			const zoomIndicator = document.getElementById('zoomIndicator');
 			zoomIndicator.textContent = \`\${Math.round(currentZoom * 100)}%\`;
@@ -993,9 +1075,11 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				const { svg } = await mermaid.render('mermaid-svg', mermaidCode);
 				element.innerHTML = svg;
 				
-				// Reset zoom when new diagram is loaded
-				currentZoom = 1.0;
-				applyZoom();
+				// Reset zoom and pan when new diagram is loaded
+				currentZoom = 2.0; // Start new diagrams at 200% zoom
+				panX = 0;
+				panY = 0;
+				applyTransform();
 				
 				hideLoading();
 			} catch (error) {
