@@ -1,0 +1,59 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2D3748;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A202C;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="nodeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A5568;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D3748;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="64" cy="64" r="60" fill="url(#bgGradient)" stroke="#4A5568" stroke-width="2" filter="url(#shadow)"/>
+  
+  <!-- Graph nodes (representing code structure) -->
+  <!-- Main entry node -->
+  <circle cx="64" cy="30" r="8" fill="url(#nodeGradient)" stroke="#718096" stroke-width="2"/>
+  
+  <!-- Secondary nodes -->
+  <circle cx="40" cy="50" r="6" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="88" cy="50" r="6" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="30" cy="75" r="5" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="64" cy="75" r="6" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="98" cy="75" r="5" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="50" cy="95" r="5" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  <circle cx="78" cy="95" r="5" fill="url(#nodeGradient)" stroke="#718096" stroke-width="1.5"/>
+  
+  <!-- Connecting lines (representing flowchart connections) -->
+  <g stroke="#718096" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.8">
+    <!-- From main node to secondary -->
+    <line x1="64" y1="38" x2="40" y2="42"/>
+    <line x1="64" y1="38" x2="88" y2="42"/>
+    
+    <!-- From secondary to tertiary -->
+    <line x1="40" y1="56" x2="30" y2="70"/>
+    <line x1="40" y1="56" x2="64" y2="69"/>
+    <line x1="88" y1="56" x2="64" y2="69"/>
+    <line x1="88" y1="56" x2="98" y2="70"/>
+    
+    <!-- From tertiary to final -->
+    <line x1="30" y1="80" x2="50" y2="90"/>
+    <line x1="64" y1="81" x2="50" y2="90"/>
+    <line x1="64" y1="81" x2="78" y2="90"/>
+    <line x1="98" y1="80" x2="78" y2="90"/>
+  </g>
+  
+  <!-- Code brackets to represent programming -->
+  <g fill="#A0AEC0" font-family="Monaco, 'Courier New', monospace" font-size="16" font-weight="bold">
+    <text x="15" y="25" opacity="0.6">{</text>
+    <text x="105" y="105" opacity="0.6">}</text>
+  </g>
+  
+  <!-- Small arrow indicating flow direction -->
+  <path d="M64 110 L67 107 L64 104 L61 107 Z" fill="#A0AEC0" opacity="0.7"/>
+</svg> 
