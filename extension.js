@@ -480,6 +480,12 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			padding: 0;
 			line-height: 1.6;
 			overflow-x: hidden;
+			--primary-accent: #0078d4;
+			--surface-primary: var(--vscode-panel-background);
+			--surface-secondary: var(--vscode-editor-background);
+			--border-subtle: var(--vscode-panel-border);
+			--text-primary: var(--vscode-editor-foreground);
+			--text-secondary: var(--vscode-descriptionForeground);
 		}
 		
 		.main-container {
@@ -489,20 +495,22 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.header {
-			background: var(--vscode-titleBar-activeBackground);
-			padding: 12px 20px;
-			border-bottom: 1px solid var(--vscode-panel-border);
+			background: var(--surface-primary);
+			padding: 16px 24px;
+			border-bottom: 1px solid var(--border-subtle);
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
 			flex-shrink: 0;
+			backdrop-filter: blur(10px);
 		}
 		
 		.header h1 {
-			color: var(--vscode-titleBar-activeForeground);
+			color: var(--text-primary);
 			margin: 0;
-			font-size: 1.4em;
-			font-weight: 600;
+			font-size: 1.2em;
+			font-weight: 500;
+			letter-spacing: 0.02em;
 		}
 		
 		.header-controls {
@@ -513,46 +521,61 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		
 		.zoom-indicator {
 			font-size: 11px;
-			color: var(--vscode-descriptionForeground);
-			background: var(--vscode-badge-background);
-			padding: 2px 6px;
-			border-radius: 3px;
-			margin-right: 10px;
+			color: var(--text-primary);
+			background: var(--surface-secondary);
+			border: 1px solid var(--border-subtle);
+			padding: 4px 8px;
+			border-radius: 6px;
+			margin-right: 12px;
+			font-family: monospace;
+			font-weight: 500;
 		}
 		
 		.btn {
-			background: var(--vscode-button-background);
-			color: var(--vscode-button-foreground);
-			border: none;
-			padding: 6px 12px;
-			border-radius: 3px;
+			background: var(--surface-secondary);
+			color: var(--text-primary);
+			border: 1px solid var(--border-subtle);
+			padding: 8px 12px;
+			border-radius: 6px;
 			cursor: pointer;
 			font-size: 12px;
 			display: flex;
 			align-items: center;
-			gap: 5px;
+			gap: 6px;
+			transition: all 0.2s ease;
+			font-weight: 500;
 		}
 		
 		.btn:hover {
-			background: var(--vscode-button-hoverBackground);
+			background: var(--primary-accent);
+			color: white;
+			border-color: var(--primary-accent);
+			transform: translateY(-1px);
+			box-shadow: 0 2px 8px rgba(0, 120, 212, 0.3);
 		}
 		
 		.btn:disabled {
 			opacity: 0.5;
 			cursor: not-allowed;
+			transform: none;
+			box-shadow: none;
 		}
 		
 		.btn-small {
-			padding: 4px 8px;
+			padding: 6px 10px;
 			font-size: 11px;
 		}
 		
 		.status-indicator {
 			font-size: 11px;
-			color: var(--vscode-descriptionForeground);
+			color: var(--text-secondary);
 			display: flex;
 			align-items: center;
-			gap: 5px;
+			gap: 6px;
+			padding: 4px 8px;
+			background: var(--surface-secondary);
+			border-radius: 4px;
+			border: 1px solid var(--border-subtle);
 		}
 		
 		.flowchart-container {
@@ -564,13 +587,16 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		
 		.diagram-viewport {
 			flex: 1;
-			background: var(--vscode-editor-background);
+			background: var(--surface-secondary);
 			display: flex;
 			align-items: center;
 			justify-content: center;
 			overflow: auto;
 			position: relative;
 			min-height: 400px;
+			border: 1px solid var(--border-subtle);
+			margin: 8px;
+			border-radius: 8px;
 		}
 		
 		#mermaid-diagram {
@@ -628,8 +654,8 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.details-panel {
-			background: var(--vscode-panel-background);
-			border-top: 1px solid var(--vscode-panel-border);
+			background: var(--surface-primary);
+			border-top: 1px solid var(--border-subtle);
 			flex-shrink: 0;
 		}
 		
@@ -637,18 +663,20 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			width: 100%;
 			background: transparent;
 			border: none;
-			padding: 12px 20px;
-			color: var(--vscode-editor-foreground);
+			padding: 16px 24px;
+			color: var(--text-primary);
 			cursor: pointer;
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
 			font-size: 13px;
-			border-bottom: 1px solid var(--vscode-panel-border);
+			font-weight: 500;
+			border-bottom: 1px solid var(--border-subtle);
+			transition: background-color 0.2s ease;
 		}
 		
 		.details-toggle:hover {
-			background: var(--vscode-list-hoverBackground);
+			background: var(--surface-secondary);
 		}
 		
 		.details-content {
@@ -663,7 +691,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.details-inner {
-			padding: 20px;
+			padding: 24px;
 		}
 		
 		.stats-grid {
@@ -674,43 +702,60 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.stat-card {
-			background: var(--vscode-editor-background);
-			padding: 12px;
-			border-radius: 4px;
+			background: var(--surface-secondary);
+			padding: 16px;
+			border-radius: 8px;
 			text-align: center;
-			border: 1px solid var(--vscode-panel-border);
+			border: 1px solid var(--border-subtle);
+			transition: transform 0.2s ease;
+		}
+		
+		.stat-card:hover {
+			transform: translateY(-2px);
 		}
 		
 		.stat-number {
-			font-size: 1.5em;
-			font-weight: bold;
-			color: var(--vscode-textLink-foreground);
+			font-size: 1.8em;
+			font-weight: 600;
+			color: var(--primary-accent);
+			margin-bottom: 4px;
 		}
 		
 		.stat-label {
-			color: var(--vscode-descriptionForeground);
-			font-size: 0.8em;
+			color: var(--text-secondary);
+			font-size: 0.85em;
+			font-weight: 500;
 		}
 		
 		.tabs {
 			display: flex;
-			border-bottom: 1px solid var(--vscode-panel-border);
-			margin-bottom: 15px;
+			border-bottom: 1px solid var(--border-subtle);
+			margin-bottom: 20px;
+			background: var(--surface-secondary);
+			border-radius: 8px 8px 0 0;
 		}
 		
 		.tab {
 			background: transparent;
 			border: none;
-			padding: 8px 16px;
+			padding: 12px 20px;
 			cursor: pointer;
-			color: var(--vscode-descriptionForeground);
+			color: var(--text-secondary);
 			border-bottom: 2px solid transparent;
 			font-size: 12px;
+			font-weight: 500;
+			transition: all 0.2s ease;
+		}
+		
+		.tab:hover {
+			color: var(--text-primary);
+			background: var(--surface-primary);
 		}
 		
 		.tab.active {
-			color: var(--vscode-textLink-foreground);
-			border-bottom-color: var(--vscode-textLink-foreground);
+			color: var(--primary-accent);
+			border-bottom-color: var(--primary-accent);
+			background: var(--surface-primary);
 		}
 		
 		.tab-content {
@@ -722,27 +767,30 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.code-block {
-			background: var(--vscode-textBlockQuote-background);
-			border-left: 4px solid var(--vscode-textLink-foreground);
-			padding: 15px;
-			border-radius: 0 4px 4px 0;
+			background: var(--surface-secondary);
+			border: 1px solid var(--border-subtle);
+			border-left: 3px solid var(--primary-accent);
+			padding: 16px;
+			border-radius: 6px;
 			font-family: var(--vscode-editor-font-family);
 			font-size: 11px;
 			white-space: pre-wrap;
 			overflow-x: auto;
 			max-height: 200px;
 			overflow-y: auto;
+			line-height: 1.4;
 		}
 		
 		.file-tree {
 			font-family: monospace;
 			font-size: 11px;
-			background: var(--vscode-editor-background);
-			padding: 15px;
-			border-radius: 4px;
-			border: 1px solid var(--vscode-panel-border);
+			background: var(--surface-secondary);
+			padding: 16px;
+			border-radius: 6px;
+			border: 1px solid var(--border-subtle);
 			max-height: 200px;
 			overflow-y: auto;
+			line-height: 1.4;
 		}
 		
 		.tree-item {
@@ -751,12 +799,12 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.tree-directory {
-			color: var(--vscode-textLink-foreground);
-			font-weight: bold;
+			color: var(--primary-accent);
+			font-weight: 600;
 		}
 		
 		.tree-file {
-			color: var(--vscode-editor-foreground);
+			color: var(--text-primary);
 		}
 		
 		.error-message {
@@ -776,19 +824,19 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			<div class="header-controls">
 				<span class="zoom-indicator" id="zoomIndicator">200%</span>
 				<div class="status-indicator" id="statusIndicator">
-					<span>🔄 Initializing...</span>
+					<span>Initializing...</span>
 				</div>
 				<button class="btn btn-small" id="refreshBtn" onclick="regenerateFlowchart()">
-					🔄 Refresh
+					Refresh
 				</button>
 				<button class="btn btn-small" onclick="copyMermaidCode()">
-					📋 Copy Code
+					Copy Code
 				</button>
 				<button class="btn btn-small" onclick="downloadSVG()">
-					⬇️ Download SVG
+					Download SVG
 				</button>
 				<button class="btn btn-small" onclick="resetZoom()" title="Reset to 200% zoom (double-click diagram)">
-					⌂ Reset
+					Reset View
 				</button>
 			</div>
 		</div>
@@ -799,7 +847,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				<div id="loadingOverlay" class="loading-overlay">
 					<div class="spinner"></div>
 					<div class="loading-text" id="loadingText">
-						<div>🔍 Analyzing repository structure...</div>
+						<div>Analyzing repository structure...</div>
 						<div style="font-size: 11px; margin-top: 5px;">This may take a moment for large repositories</div>
 					</div>
 				</div>
@@ -809,7 +857,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		
 		<div class="details-panel">
 			<button class="details-toggle" onclick="toggleDetails()">
-				<span>📊 Repository Details & Analysis</span>
+				<span>Repository Details & Analysis</span>
 				<span id="toggleIcon">▲</span>
 			</button>
 			<div class="details-content" id="detailsContent">
@@ -817,9 +865,9 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					<div id="stats" class="stats-grid"></div>
 					
 					<div class="tabs">
-						<button class="tab active" onclick="switchTab('structure')">📁 Structure</button>
-						<button class="tab" onclick="switchTab('mermaid')">💻 Mermaid Code</button>
-						<button class="tab" onclick="switchTab('claude')">🤖 Claude Prompt</button>
+						<button class="tab active" onclick="switchTab('structure')">Structure</button>
+						<button class="tab" onclick="switchTab('mermaid')">Mermaid Code</button>
+						<button class="tab" onclick="switchTab('claude')">Claude Prompt</button>
 					</div>
 					
 					<div id="structure-tab" class="tab-content active">
@@ -836,7 +884,7 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 						</p>
 						<div id="claudePrompt" class="code-block"></div>
 						<button class="btn btn-small" onclick="copyPrompt()" style="margin-top: 10px;">
-							📋 Copy Claude Prompt
+							Copy Claude Prompt
 						</button>
 					</div>
 				</div>
@@ -861,16 +909,28 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		document.addEventListener('DOMContentLoaded', () => {
 			mermaid.initialize({ 
 				startOnLoad: false,
-				theme: 'base',
+				theme: 'dark',
 				themeVariables: {
-					primaryColor: '#007acc',
+					primaryColor: '#0078d4',
 					primaryTextColor: '#ffffff',
-					primaryBorderColor: '#005a9e',
-					lineColor: '#007acc',
-					sectionBkgColor: '#f0f8ff',
-					altSectionBkgColor: '#e6f3ff',
-					gridColor: '#cccccc',
-					tertiaryColor: '#f9f9f9'
+					primaryBorderColor: '#106ebe',
+					lineColor: '#0078d4',
+					sectionBkgColor: '#1e1e1e',
+					altSectionBkgColor: '#2d2d30',
+					gridColor: '#404040',
+					tertiaryColor: '#252526',
+					background: '#1e1e1e',
+					mainBkg: '#2d2d30',
+					secondBkg: '#252526',
+					tertiaryColor: '#404040',
+					primaryBorderColor: '#0078d4',
+					primaryTextColor: '#ffffff',
+					lineColor: '#0078d4',
+					secondaryColor: '#005a9e',
+					tertiaryTextColor: '#ffffff',
+					labelTextColor: '#ffffff',
+					textColor: '#ffffff',
+					nodeTextColor: '#ffffff'
 				}
 			});
 			
@@ -882,8 +942,8 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		});
 
 		function autoStartAnalysis() {
-			updateStatus('🔍 Analyzing repository...', 'analyzing');
-			updateLoadingText('🔍 Analyzing repository structure...', 'Scanning files and directories...');
+			updateStatus('Analyzing repository...', 'analyzing');
+			updateLoadingText('Analyzing repository structure...', 'Scanning files and directories...');
 			
 			vscode.postMessage({
 				command: 'analyzeRepository'
@@ -896,8 +956,8 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				return;
 			}
 			
-			updateStatus('🎨 Generating flowchart...', 'generating');
-			updateLoadingText('🎨 Generating flowchart...', 'Creating visual representation...');
+			updateStatus('Generating flowchart...', 'generating');
+			updateLoadingText('Generating flowchart...', 'Creating visual representation...');
 			showLoading();
 			
 			vscode.postMessage({
@@ -1197,8 +1257,8 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				case 'repositoryAnalyzed':
 					currentAnalysis = message.data;
 					
-					updateStatus('🎨 Generating flowchart...', 'generating');
-					updateLoadingText('🎨 Generating flowchart...', 'Creating visual representation...');
+					updateStatus('Generating flowchart...', 'generating');
+					updateLoadingText('Generating flowchart...', 'Creating visual representation...');
 					
 					renderStats(message.data.stats);
 					document.getElementById('structure').innerHTML = renderStructure(message.data.structure);
@@ -1217,9 +1277,8 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
 					
 					// Show generation source in status
-					const sourceIcon = message.data.source === 'claude' ? '🤖' : '🏠';
 					const sourceText = message.data.source === 'claude' ? 'Generated with Claude AI' : 'Generated locally';
-					updateStatus(\`\${sourceIcon} \${sourceText}\`, 'completed');
+					updateStatus(sourceText, 'completed');
 					
 					renderMermaidDiagram(message.data.mermaidCode);
 					break;
