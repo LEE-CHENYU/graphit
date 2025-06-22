@@ -265,10 +265,10 @@ class WebviewManager {
 		}
 		
 		/* =================================================================
-		   MERMAID DIAGRAM STYLING - CENTRALIZED
+		   MERMAID DIAGRAM STYLING - CENTRALIZED & COMPREHENSIVE
 		   ================================================================= */
 		
-		/* Text Elements */
+		/* UNIVERSAL TEXT VISIBILITY - Covers all possible Mermaid text elements */
 		#mermaid-diagram svg text,
 		#mermaid-diagram svg .nodeLabel,
 		#mermaid-diagram svg .edgeLabel,
@@ -285,39 +285,100 @@ class WebviewManager {
 		#mermaid-diagram svg g text,
 		#mermaid-diagram svg foreignObject text,
 		#mermaid-diagram svg .flowchart text,
-		#mermaid-diagram svg .subgraph text {
+		#mermaid-diagram svg .subgraph text,
+		#mermaid-diagram svg .flowchart-label text,
+		#mermaid-diagram svg .flowchartTitleText,
+		#mermaid-diagram svg .node .label,
+		#mermaid-diagram svg .node span,
+		#mermaid-diagram svg .edgeLabel span,
+		#mermaid-diagram svg .nodeLabel span,
+		#mermaid-diagram svg g.nodes text,
+		#mermaid-diagram svg g.node text,
+		#mermaid-diagram svg g.edgeLabels text,
+		#mermaid-diagram svg g.edgeLabel text {
 			font-family: 'Segoe UI', system-ui, sans-serif !important;
 			font-weight: 500 !important;
 			font-size: 14px !important;
-			fill: var(--mermaid-text) !important;
-			color: var(--mermaid-text) !important;
+			fill: rgba(220, 220, 220, 0.98) !important;
+			color: rgba(220, 220, 220, 0.98) !important;
+			stroke: none !important;
+			opacity: 1 !important;
+			visibility: visible !important;
+		}
+		
+		/* MAXIMUM SPECIFICITY TEXT OVERRIDES - For stubborn elements */
+		#mermaid-diagram svg g.nodes text,
+		#mermaid-diagram svg g.node text,
+		#mermaid-diagram svg .nodeLabel,
+		#mermaid-diagram svg .node .label,
+		#mermaid-diagram svg .flowchart .nodeLabel,
+		#mermaid-diagram svg .flowchart .node text,
+		#mermaid-diagram svg .flowchart g.node text,
+		#mermaid-diagram svg .flowchart g.nodes text {
+			fill: rgba(220, 220, 220, 0.98) !important;
+			color: rgba(220, 220, 220, 0.98) !important;
+			opacity: 1 !important;
+			visibility: visible !important;
 			stroke: none !important;
 		}
 		
-		/* Edges */
-		#mermaid-diagram svg .edgePath .path {
-			stroke-width: 2px !important;
-			stroke: var(--mermaid-edge) !important;
+		/* EDGE TEXT VISIBILITY - Consistent across all analysis types */
+		#mermaid-diagram svg .edgeLabels text,
+		#mermaid-diagram svg .edgeLabel text,
+		#mermaid-diagram svg g.edgeLabels text,
+		#mermaid-diagram svg g.edgeLabel text,
+		#mermaid-diagram svg .flowchart .edgeLabel text {
+			fill: rgba(200, 200, 200, 0.9) !important;
+			color: rgba(200, 200, 200, 0.9) !important;
+			opacity: 1 !important;
+			visibility: visible !important;
 		}
 		
-		/* Edge Labels */
+		/* SUBGRAPH/CLUSTER TEXT - For function analysis layers */
+		#mermaid-diagram svg .cluster text,
+		#mermaid-diagram svg .subgraph text,
+		#mermaid-diagram svg .cluster .label,
+		#mermaid-diagram svg .subgraph .label,
+		#mermaid-diagram svg g.clusters text,
+		#mermaid-diagram svg g.cluster text {
+			fill: rgba(200, 200, 200, 0.95) !important;
+			color: rgba(200, 200, 200, 0.95) !important;
+			font-weight: 600 !important;
+			opacity: 1 !important;
+			visibility: visible !important;
+		}
+		
+		/* EDGES - Consistent styling */
+		#mermaid-diagram svg .edgePath .path,
+		#mermaid-diagram svg .flowchart .edgePath .path,
+		#mermaid-diagram svg g.edgePaths .path {
+			stroke-width: 2px !important;
+			stroke: rgba(128, 128, 128, 0.8) !important;
+		}
+		
+		/* EDGE LABELS BACKGROUND - Consistent across analysis types */
 		#mermaid-diagram svg .edgeLabel rect,
-		#mermaid-diagram svg .edgeLabel .label-container {
-			fill: var(--glass-overlay) !important;
-			stroke: var(--glass-border-hover) !important;
+		#mermaid-diagram svg .edgeLabel .label-container,
+		#mermaid-diagram svg .flowchart .edgeLabel rect,
+		#mermaid-diagram svg g.edgeLabels rect {
+			fill: rgba(128, 128, 128, 0.1) !important;
+			stroke: rgba(128, 128, 128, 0.3) !important;
 			stroke-width: 1px !important;
 		}
 		
-		/* Subgraphs/Clusters */
-		#mermaid-diagram svg .cluster rect {
+		/* SUBGRAPHS/CLUSTERS BACKGROUND - For function analysis architectural layers */
+		#mermaid-diagram svg .cluster rect,
+		#mermaid-diagram svg .subgraph rect,
+		#mermaid-diagram svg .flowchart .cluster rect,
+		#mermaid-diagram svg g.clusters rect {
 			rx: 4px !important;
 			ry: 4px !important;
-			fill: var(--mermaid-cluster-bg) !important;
-			stroke: var(--mermaid-cluster-border) !important;
+			fill: rgba(128, 128, 128, 0.12) !important;
+			stroke: rgba(128, 128, 128, 0.4) !important;
 			stroke-width: 2px !important;
 		}
 		
-		/* Nodes */
+		/* NODES - Universal node styling for all analysis types */
 		#mermaid-diagram svg .node rect,
 		#mermaid-diagram svg .node circle,
 		#mermaid-diagram svg .node polygon,
@@ -325,17 +386,56 @@ class WebviewManager {
 		#mermaid-diagram svg .nodeLabel rect,
 		#mermaid-diagram svg .label rect,
 		#mermaid-diagram svg .node .label-container,
-		#mermaid-diagram svg .flowchart-label rect {
-			fill: var(--mermaid-node-bg) !important;
-			stroke: var(--mermaid-node-border) !important;
+		#mermaid-diagram svg .flowchart-label rect,
+		#mermaid-diagram svg .flowchart .node rect,
+		#mermaid-diagram svg .flowchart .nodeLabel rect,
+		#mermaid-diagram svg g.nodes rect,
+		#mermaid-diagram svg g.node rect {
+			fill: rgba(128, 128, 128, 0.15) !important;
+			stroke: rgba(128, 128, 128, 0.6) !important;
 			stroke-width: 2px !important;
 		}
 		
-		/* Override any white backgrounds */
+		/* DECISION DIAMONDS - Special styling for function analysis decision points */
+		#mermaid-diagram svg .node polygon,
+		#mermaid-diagram svg .flowchart .node polygon,
+		#mermaid-diagram svg g.node polygon {
+			fill: rgba(128, 128, 128, 0.18) !important;
+			stroke: rgba(128, 128, 128, 0.7) !important;
+			stroke-width: 2px !important;
+		}
+		
+		/* OVERRIDE ANY WHITE/TRANSPARENT BACKGROUNDS */
 		#mermaid-diagram svg [fill="#ffffff"],
 		#mermaid-diagram svg [fill="white"],
-		#mermaid-diagram svg [fill="rgb(255,255,255)"] {
-			fill: var(--mermaid-node-bg) !important;
+		#mermaid-diagram svg [fill="rgb(255,255,255)"],
+		#mermaid-diagram svg [fill="transparent"],
+		#mermaid-diagram svg [fill="none"] {
+			fill: rgba(128, 128, 128, 0.15) !important;
+		}
+		
+		/* FORCE VISIBILITY FOR ANY HIDDEN TEXT */
+		#mermaid-diagram svg [opacity="0"],
+		#mermaid-diagram svg [visibility="hidden"],
+		#mermaid-diagram svg text[fill="transparent"],
+		#mermaid-diagram svg text[fill="none"],
+		#mermaid-diagram svg .label[fill="transparent"],
+		#mermaid-diagram svg .nodeLabel[fill="transparent"] {
+			fill: rgba(220, 220, 220, 0.98) !important;
+			opacity: 1 !important;
+			visibility: visible !important;
+		}
+		
+		/* ENSURE ALL TEXT IS VISIBLE - Final catch-all */
+		#mermaid-diagram svg * {
+			--text-color: rgba(220, 220, 220, 0.98);
+		}
+		
+		#mermaid-diagram svg text,
+		#mermaid-diagram svg .label,
+		#mermaid-diagram svg .nodeLabel {
+			fill: var(--text-color) !important;
+			color: var(--text-color) !important;
 		}
 		
 		/* =================================================================
@@ -681,34 +781,30 @@ class WebviewManager {
 		let currentFunctionAnalysis = null;
 		
 		document.addEventListener('DOMContentLoaded', () => {
-			// Get CSS variables for consistent theming
-			const rootStyles = getComputedStyle(document.documentElement);
-			const getMermaidColor = (cssVar) => rootStyles.getPropertyValue(cssVar).trim();
-			
 			mermaid.initialize({ 
 				startOnLoad: false,
 				theme: 'base',
 				themeVariables: {
-					// Use centralized color system
-					primaryColor: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
-					primaryTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
-					primaryBorderColor: getMermaidColor('--mermaid-node-border') || 'rgba(128, 128, 128, 0.6)',
-					lineColor: getMermaidColor('--mermaid-edge') || 'rgba(128, 128, 128, 0.8)',
-					secondaryColor: getMermaidColor('--mermaid-cluster-bg') || 'rgba(112, 112, 112, 0.12)',
-					tertiaryColor: getMermaidColor('--glass-overlay') || 'rgba(96, 96, 96, 0.1)',
+					// Use direct color values for reliable text visibility
+					primaryColor: 'rgba(128, 128, 128, 0.15)',
+					primaryTextColor: 'rgba(220, 220, 220, 0.98)',
+					primaryBorderColor: 'rgba(128, 128, 128, 0.6)',
+					lineColor: 'rgba(128, 128, 128, 0.8)',
+					secondaryColor: 'rgba(112, 112, 112, 0.12)',
+					tertiaryColor: 'rgba(96, 96, 96, 0.1)',
 					background: 'transparent',
-					mainBkg: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
-					secondBkg: getMermaidColor('--mermaid-cluster-bg') || 'rgba(112, 112, 112, 0.12)',
-					tertiaryTextColor: getMermaidColor('--text-muted') || 'rgba(200, 200, 200, 0.8)',
-					labelTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
-					textColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
-					nodeTextColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
-					nodeBkg: getMermaidColor('--mermaid-node-bg') || 'rgba(128, 128, 128, 0.15)',
-					edgeLabelBackground: getMermaidColor('--glass-overlay') || 'rgba(128, 128, 128, 0.1)',
-					edgeLabelColor: getMermaidColor('--mermaid-text') || 'rgba(200, 200, 200, 0.9)',
-					clusterBkg: getMermaidColor('--mermaid-cluster-bg') || 'rgba(128, 128, 128, 0.12)',
-					clusterBorder: getMermaidColor('--mermaid-cluster-border') || 'rgba(128, 128, 128, 0.4)',
-					altBackground: getMermaidColor('--glass-overlay') || 'rgba(96, 96, 96, 0.1)',
+					mainBkg: 'rgba(128, 128, 128, 0.15)',
+					secondBkg: 'rgba(112, 112, 112, 0.12)',
+					tertiaryTextColor: 'rgba(200, 200, 200, 0.9)',
+					labelTextColor: 'rgba(220, 220, 220, 0.98)',
+					textColor: 'rgba(220, 220, 220, 0.98)',
+					nodeTextColor: 'rgba(220, 220, 220, 0.98)',
+					nodeBkg: 'rgba(128, 128, 128, 0.15)',
+					edgeLabelBackground: 'rgba(128, 128, 128, 0.1)',
+					edgeLabelColor: 'rgba(200, 200, 200, 0.9)',
+					clusterBkg: 'rgba(128, 128, 128, 0.12)',
+					clusterBorder: 'rgba(128, 128, 128, 0.4)',
+					altBackground: 'rgba(96, 96, 96, 0.1)',
 					fontFamily: 'Segoe UI, system-ui, sans-serif',
 					fontSize: '14px'
 				}
