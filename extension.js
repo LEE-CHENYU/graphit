@@ -477,51 +477,60 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			background-color: var(--vscode-editor-background);
 			color: var(--vscode-editor-foreground);
 			margin: 0;
-			padding: 20px;
+			padding: 0;
 			line-height: 1.6;
+			overflow-x: hidden;
 		}
 		
-		.container {
-			max-width: 1200px;
-			margin: 0 auto;
+		.main-container {
+			display: flex;
+			flex-direction: column;
+			height: 100vh;
 		}
 		
 		.header {
-			text-align: center;
-			margin-bottom: 30px;
-			padding-bottom: 20px;
+			background: var(--vscode-titleBar-activeBackground);
+			padding: 12px 20px;
 			border-bottom: 1px solid var(--vscode-panel-border);
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			flex-shrink: 0;
 		}
 		
 		.header h1 {
-			color: var(--vscode-textLink-foreground);
+			color: var(--vscode-titleBar-activeForeground);
 			margin: 0;
-			font-size: 2.5em;
+			font-size: 1.4em;
+			font-weight: 600;
 		}
 		
-		.header p {
-			margin: 10px 0 0 0;
+		.header-controls {
+			display: flex;
+			gap: 10px;
+			align-items: center;
+		}
+		
+		.zoom-indicator {
+			font-size: 11px;
 			color: var(--vscode-descriptionForeground);
-		}
-		
-		.action-section {
-			background: var(--vscode-panel-background);
-			padding: 20px;
-			border-radius: 8px;
-			margin-bottom: 20px;
-			border: 1px solid var(--vscode-panel-border);
+			background: var(--vscode-badge-background);
+			padding: 2px 6px;
+			border-radius: 3px;
+			margin-right: 10px;
 		}
 		
 		.btn {
 			background: var(--vscode-button-background);
 			color: var(--vscode-button-foreground);
 			border: none;
-			padding: 12px 24px;
-			border-radius: 4px;
+			padding: 6px 12px;
+			border-radius: 3px;
 			cursor: pointer;
-			font-size: 14px;
-			margin-right: 10px;
-			margin-bottom: 10px;
+			font-size: 12px;
+			display: flex;
+			align-items: center;
+			gap: 5px;
 		}
 		
 		.btn:hover {
@@ -529,72 +538,74 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		}
 		
 		.btn:disabled {
-			background: var(--vscode-button-background);
 			opacity: 0.5;
 			cursor: not-allowed;
 		}
 		
-		.analysis-results {
+		.btn-small {
+			padding: 4px 8px;
+			font-size: 11px;
+		}
+		
+		.status-indicator {
+			font-size: 11px;
+			color: var(--vscode-descriptionForeground);
+			display: flex;
+			align-items: center;
+			gap: 5px;
+		}
+		
+		.flowchart-container {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			min-height: 0;
+		}
+		
+		.diagram-viewport {
+			flex: 1;
 			background: var(--vscode-editor-background);
-			border: 1px solid var(--vscode-panel-border);
-			border-radius: 4px;
-			padding: 15px;
-			margin-top: 15px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			overflow: auto;
+			position: relative;
+			min-height: 400px;
 		}
 		
-		.stats-grid {
-			display: grid;
-			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-			gap: 15px;
-			margin-bottom: 20px;
+		#mermaid-diagram {
+			max-width: 100%;
+			max-height: 100%;
+			transition: transform 0.2s ease;
+			transform-origin: center center;
 		}
 		
-		.stat-card {
-			background: var(--vscode-panel-background);
-			padding: 15px;
-			border-radius: 4px;
-			text-align: center;
-			border: 1px solid var(--vscode-panel-border);
+		.loading-overlay {
+			position: absolute;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: var(--vscode-editor-background);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			z-index: 10;
 		}
 		
-		.stat-number {
-			font-size: 2em;
-			font-weight: bold;
-			color: var(--vscode-textLink-foreground);
-		}
-		
-		.stat-label {
-			color: var(--vscode-descriptionForeground);
-			font-size: 0.9em;
-		}
-		
-		.claude-prompt {
-			background: var(--vscode-textBlockQuote-background);
-			border-left: 4px solid var(--vscode-textLink-foreground);
-			padding: 15px;
-			margin: 15px 0;
-			border-radius: 0 4px 4px 0;
-			font-family: var(--vscode-editor-font-family);
-			font-size: 12px;
-			white-space: pre-wrap;
-			overflow-x: auto;
-		}
-		
-		.loading {
-			text-align: center;
-			color: var(--vscode-descriptionForeground);
-			padding: 20px;
+		.loading-overlay.hidden {
+			display: none;
 		}
 		
 		.spinner {
 			border: 2px solid var(--vscode-panel-border);
 			border-top: 2px solid var(--vscode-textLink-foreground);
 			border-radius: 50%;
-			width: 20px;
-			height: 20px;
+			width: 24px;
+			height: 24px;
 			animation: spin 1s linear infinite;
-			display: inline-block;
-			margin-right: 10px;
+			margin-bottom: 15px;
 		}
 		
 		@keyframes spin {
@@ -602,86 +613,93 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			100% { transform: rotate(360deg); }
 		}
 		
-		.file-tree {
-			font-family: monospace;
-			font-size: 12px;
-			background: var(--vscode-editor-background);
-			padding: 15px;
-			border-radius: 4px;
-			border: 1px solid var(--vscode-panel-border);
-			max-height: 400px;
+		.loading-text {
+			color: var(--vscode-descriptionForeground);
+			text-align: center;
+		}
+		
+		.details-panel {
+			background: var(--vscode-panel-background);
+			border-top: 1px solid var(--vscode-panel-border);
+			flex-shrink: 0;
+		}
+		
+		.details-toggle {
+			width: 100%;
+			background: transparent;
+			border: none;
+			padding: 12px 20px;
+			color: var(--vscode-editor-foreground);
+			cursor: pointer;
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			font-size: 13px;
+			border-bottom: 1px solid var(--vscode-panel-border);
+		}
+		
+		.details-toggle:hover {
+			background: var(--vscode-list-hoverBackground);
+		}
+		
+		.details-content {
+			max-height: 0;
+			overflow: hidden;
+			transition: max-height 0.3s ease;
+		}
+		
+		.details-content.expanded {
+			max-height: 50vh;
 			overflow-y: auto;
 		}
 		
-		.tree-item {
-			margin: 2px 0;
-			padding: 2px 0;
-		}
-		
-		.tree-directory {
-			color: var(--vscode-textLink-foreground);
-			font-weight: bold;
-		}
-		
-		.tree-file {
-			color: var(--vscode-editor-foreground);
-		}
-		
-		.copy-btn {
-			background: var(--vscode-button-secondaryBackground);
-			color: var(--vscode-button-secondaryForeground);
-			border: 1px solid var(--vscode-button-border);
-			padding: 8px 16px;
-			border-radius: 4px;
-			cursor: pointer;
-			font-size: 12px;
-			margin-top: 10px;
-		}
-		
-		.copy-btn:hover {
-			background: var(--vscode-button-secondaryHoverBackground);
-		}
-		
-		.flowchart-container {
-			background: var(--vscode-editor-background);
-			border: 1px solid var(--vscode-panel-border);
-			border-radius: 4px;
+		.details-inner {
 			padding: 20px;
-			margin: 15px 0;
+		}
+		
+		.stats-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			gap: 15px;
+			margin-bottom: 20px;
+		}
+		
+		.stat-card {
+			background: var(--vscode-editor-background);
+			padding: 12px;
+			border-radius: 4px;
 			text-align: center;
-			overflow-x: auto;
+			border: 1px solid var(--vscode-panel-border);
 		}
 		
-		#mermaid-diagram {
-			max-width: 100%;
-			height: auto;
+		.stat-number {
+			font-size: 1.5em;
+			font-weight: bold;
+			color: var(--vscode-textLink-foreground);
 		}
 		
-		.flowchart-controls {
-			margin: 10px 0;
-			text-align: center;
+		.stat-label {
+			color: var(--vscode-descriptionForeground);
+			font-size: 0.8em;
 		}
 		
-		.tab-container {
-			margin-top: 20px;
-		}
-		
-		.tab-buttons {
+		.tabs {
 			display: flex;
 			border-bottom: 1px solid var(--vscode-panel-border);
 			margin-bottom: 15px;
 		}
 		
-		.tab-button {
+		.tab {
 			background: transparent;
 			border: none;
-			padding: 10px 20px;
+			padding: 8px 16px;
 			cursor: pointer;
-			color: var(--vscode-editor-foreground);
+			color: var(--vscode-descriptionForeground);
 			border-bottom: 2px solid transparent;
+			font-size: 12px;
 		}
 		
-		.tab-button.active {
+		.tab.active {
 			color: var(--vscode-textLink-foreground);
 			border-bottom-color: var(--vscode-textLink-foreground);
 		}
@@ -693,68 +711,127 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		.tab-content.active {
 			display: block;
 		}
+		
+		.code-block {
+			background: var(--vscode-textBlockQuote-background);
+			border-left: 4px solid var(--vscode-textLink-foreground);
+			padding: 15px;
+			border-radius: 0 4px 4px 0;
+			font-family: var(--vscode-editor-font-family);
+			font-size: 11px;
+			white-space: pre-wrap;
+			overflow-x: auto;
+			max-height: 200px;
+			overflow-y: auto;
+		}
+		
+		.file-tree {
+			font-family: monospace;
+			font-size: 11px;
+			background: var(--vscode-editor-background);
+			padding: 15px;
+			border-radius: 4px;
+			border: 1px solid var(--vscode-panel-border);
+			max-height: 200px;
+			overflow-y: auto;
+		}
+		
+		.tree-item {
+			margin: 1px 0;
+			padding: 1px 0;
+		}
+		
+		.tree-directory {
+			color: var(--vscode-textLink-foreground);
+			font-weight: bold;
+		}
+		
+		.tree-file {
+			color: var(--vscode-editor-foreground);
+		}
+		
+		.error-message {
+			color: var(--vscode-errorForeground);
+			background: var(--vscode-inputValidation-errorBackground);
+			border: 1px solid var(--vscode-inputValidation-errorBorder);
+			padding: 15px;
+			border-radius: 4px;
+			margin: 20px;
+		}
 	</style>
 </head>
 <body>
-	<div class="container">
+	<div class="main-container">
 		<div class="header">
 			<h1>🔗 GraphIt</h1>
-			<p>Visualize your repository structure with AI-powered flowcharts</p>
-		</div>
-		
-		<div class="action-section">
-			<h3>Repository Analysis</h3>
-			<p>Analyze your current workspace to generate a comprehensive repository structure map.</p>
-			<button class="btn" id="analyzeBtn" onclick="analyzeRepository()">
-				📊 Analyze Repository
-			</button>
-			<button class="btn" id="generateBtn" onclick="generateFlowchart()" disabled>
-				🎨 Generate Flowchart
-			</button>
-			<div id="generationInfo" style="margin-top: 10px; color: var(--vscode-descriptionForeground); font-size: 12px;"></div>
-		</div>
-		
-		<div id="results" style="display: none;">
-			<div class="action-section">
-				<h3>Analysis Results</h3>
-				<div id="stats" class="stats-grid"></div>
-				<div id="structure" class="file-tree"></div>
+			<div class="header-controls">
+				<span class="zoom-indicator" id="zoomIndicator">100%</span>
+				<div class="status-indicator" id="statusIndicator">
+					<span>🔄 Initializing...</span>
+				</div>
+				<button class="btn btn-small" id="refreshBtn" onclick="regenerateFlowchart()">
+					🔄 Refresh
+				</button>
+				<button class="btn btn-small" onclick="copyMermaidCode()">
+					📋 Copy Code
+				</button>
+				<button class="btn btn-small" onclick="downloadSVG()">
+					⬇️ Download SVG
+				</button>
+				<button class="btn btn-small" onclick="resetZoom()" title="Reset zoom (double-click diagram)">
+					⌂ Reset
+				</button>
 			</div>
 		</div>
 		
-		<div id="flowchartSection" style="display: none;">
-			<div class="action-section">
-				<h3>🎨 Repository Flowchart</h3>
-				<div class="flowchart-container">
-					<div id="mermaid-diagram"></div>
+		<div class="flowchart-container">
+			<div class="diagram-viewport">
+				<div id="mermaid-diagram"></div>
+				<div id="loadingOverlay" class="loading-overlay">
+					<div class="spinner"></div>
+					<div class="loading-text" id="loadingText">
+						<div>🔍 Analyzing repository structure...</div>
+						<div style="font-size: 11px; margin-top: 5px;">This may take a moment for large repositories</div>
+					</div>
 				</div>
-				<div class="flowchart-controls">
-					<button class="copy-btn" onclick="copyMermaidCode()">📋 Copy Mermaid Code</button>
-					<button class="copy-btn" onclick="downloadSVG()">⬇️ Download SVG</button>
-				</div>
-				
-				<div class="tab-container">
-					<div class="tab-buttons">
-						<button class="tab-button active" onclick="switchTab('mermaid')">Mermaid Code</button>
-						<button class="tab-button" onclick="switchTab('claude')">Claude Prompt</button>
+				<div id="errorMessage" class="error-message" style="display: none;"></div>
+			</div>
+		</div>
+		
+		<div class="details-panel">
+			<button class="details-toggle" onclick="toggleDetails()">
+				<span>📊 Repository Details & Analysis</span>
+				<span id="toggleIcon">▲</span>
+			</button>
+			<div class="details-content" id="detailsContent">
+				<div class="details-inner">
+					<div id="stats" class="stats-grid"></div>
+					
+					<div class="tabs">
+						<button class="tab active" onclick="switchTab('structure')">📁 Structure</button>
+						<button class="tab" onclick="switchTab('mermaid')">💻 Mermaid Code</button>
+						<button class="tab" onclick="switchTab('claude')">🤖 Claude Prompt</button>
 					</div>
 					
-					<div id="mermaid-tab" class="tab-content active">
-						<div id="mermaidCode" class="claude-prompt"></div>
+					<div id="structure-tab" class="tab-content active">
+						<div id="structure" class="file-tree"></div>
+					</div>
+					
+					<div id="mermaid-tab" class="tab-content">
+						<div id="mermaidCode" class="code-block"></div>
 					</div>
 					
 					<div id="claude-tab" class="tab-content">
-						<p>Copy the prompt below and paste it into Claude for enhanced flowchart generation:</p>
-						<div id="claudePrompt" class="claude-prompt"></div>
-						<button class="copy-btn" onclick="copyPrompt()">📋 Copy Claude Prompt</button>
+						<p style="margin-top: 0; font-size: 12px; color: var(--vscode-descriptionForeground);">
+							Copy this prompt to use with Claude for enhanced flowchart generation:
+						</p>
+						<div id="claudePrompt" class="code-block"></div>
+						<button class="btn btn-small" onclick="copyPrompt()" style="margin-top: 10px;">
+							📋 Copy Claude Prompt
+						</button>
 					</div>
 				</div>
 			</div>
-		</div>
-		
-		<div id="loading" class="loading" style="display: none;">
-			<div class="spinner"></div>
-			<span>Analyzing repository...</span>
 		</div>
 	</div>
 
@@ -762,6 +839,9 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 		const vscode = acquireVsCodeApi();
 		let currentAnalysis = null;
 		let currentMermaidCode = null;
+		let detailsExpanded = false;
+		let currentZoom = 1.0;
+		let initialTouchDistance = 0;
 		
 		// Initialize Mermaid
 		document.addEventListener('DOMContentLoaded', () => {
@@ -779,31 +859,130 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					tertiaryColor: '#f9f9f9'
 				}
 			});
+			
+			// Auto-start analysis
+			setTimeout(autoStartAnalysis, 500);
+			
+			// Setup zoom event listeners
+			setupZoomControls();
 		});
 
-		function analyzeRepository() {
-			document.getElementById('loading').style.display = 'block';
-			document.getElementById('results').style.display = 'none';
-			document.getElementById('flowchartSection').style.display = 'none';
-			document.getElementById('analyzeBtn').disabled = true;
-			document.getElementById('generateBtn').disabled = true;
+		function autoStartAnalysis() {
+			updateStatus('🔍 Analyzing repository...', 'analyzing');
+			updateLoadingText('🔍 Analyzing repository structure...', 'Scanning files and directories...');
 			
 			vscode.postMessage({
 				command: 'analyzeRepository'
 			});
 		}
 
-		function generateFlowchart() {
-			if (!currentAnalysis) return;
+		function regenerateFlowchart() {
+			if (!currentAnalysis) {
+				autoStartAnalysis();
+				return;
+			}
 			
-			// Show loading state
-			document.getElementById('generateBtn').disabled = true;
-			document.getElementById('generationInfo').innerHTML = '🤖 Generating flowchart with Claude AI...';
+			updateStatus('🎨 Generating flowchart...', 'generating');
+			updateLoadingText('🎨 Generating flowchart...', 'Creating visual representation...');
+			showLoading();
 			
 			vscode.postMessage({
 				command: 'generateFlowchart',
 				data: currentAnalysis
 			});
+		}
+
+		function updateStatus(text, state) {
+			const indicator = document.getElementById('statusIndicator');
+			indicator.innerHTML = \`<span>\${text}</span>\`;
+			
+			const refreshBtn = document.getElementById('refreshBtn');
+			refreshBtn.disabled = (state === 'analyzing' || state === 'generating');
+		}
+
+		function updateLoadingText(primary, secondary) {
+			const loadingText = document.getElementById('loadingText');
+			loadingText.innerHTML = \`
+				<div>\${primary}</div>
+				<div style="font-size: 11px; margin-top: 5px;">\${secondary}</div>
+			\`;
+		}
+
+		function showLoading() {
+			document.getElementById('loadingOverlay').classList.remove('hidden');
+			document.getElementById('errorMessage').style.display = 'none';
+		}
+
+		function hideLoading() {
+			document.getElementById('loadingOverlay').classList.add('hidden');
+		}
+
+		function showError(message) {
+			hideLoading();
+			const errorEl = document.getElementById('errorMessage');
+			errorEl.textContent = \`Error: \${message}\`;
+			errorEl.style.display = 'block';
+		}
+
+		function setupZoomControls() {
+			const diagramViewport = document.querySelector('.diagram-viewport');
+			
+			// Mouse wheel zoom
+			diagramViewport.addEventListener('wheel', (e) => {
+				e.preventDefault();
+				
+				const zoomSensitivity = 0.001;
+				const zoomDirection = e.deltaY > 0 ? -1 : 1;
+				const zoomFactor = 1 + (zoomDirection * zoomSensitivity * Math.abs(e.deltaY));
+				
+				currentZoom = Math.min(Math.max(currentZoom * zoomFactor, 0.2), 3.0);
+				applyZoom();
+			});
+			
+			// Touch pinch-to-zoom
+			diagramViewport.addEventListener('touchstart', (e) => {
+				if (e.touches.length === 2) {
+					e.preventDefault();
+					initialTouchDistance = getTouchDistance(e.touches);
+				}
+			});
+			
+			diagramViewport.addEventListener('touchmove', (e) => {
+				if (e.touches.length === 2) {
+					e.preventDefault();
+					const currentDistance = getTouchDistance(e.touches);
+					const scaleFactor = currentDistance / initialTouchDistance;
+					
+					currentZoom = Math.min(Math.max(currentZoom * scaleFactor, 0.2), 3.0);
+					applyZoom();
+					
+					initialTouchDistance = currentDistance;
+				}
+			});
+			
+			// Double-click to reset zoom
+			diagramViewport.addEventListener('dblclick', () => {
+				resetZoom();
+			});
+		}
+
+		function getTouchDistance(touches) {
+			const dx = touches[0].clientX - touches[1].clientX;
+			const dy = touches[0].clientY - touches[1].clientY;
+			return Math.sqrt(dx * dx + dy * dy);
+		}
+
+		function resetZoom() {
+			currentZoom = 1.0;
+			applyZoom();
+		}
+
+		function applyZoom() {
+			const diagram = document.getElementById('mermaid-diagram');
+			diagram.style.transform = \`scale(\${currentZoom})\`;
+			
+			const zoomIndicator = document.getElementById('zoomIndicator');
+			zoomIndicator.textContent = \`\${Math.round(currentZoom * 100)}%\`;
 		}
 
 		async function renderMermaidDiagram(mermaidCode) {
@@ -813,23 +992,63 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			try {
 				const { svg } = await mermaid.render('mermaid-svg', mermaidCode);
 				element.innerHTML = svg;
+				
+				// Reset zoom when new diagram is loaded
+				currentZoom = 1.0;
+				applyZoom();
+				
+				hideLoading();
 			} catch (error) {
 				console.error('Error rendering Mermaid diagram:', error);
-				element.innerHTML = '<p style="color: red;">Error rendering diagram. Check console for details.</p>';
+				showError('Failed to render diagram. Check console for details.');
 			}
+		}
+		
+		function toggleDetails() {
+			detailsExpanded = !detailsExpanded;
+			const content = document.getElementById('detailsContent');
+			const icon = document.getElementById('toggleIcon');
+			
+			if (detailsExpanded) {
+				content.classList.add('expanded');
+				icon.textContent = '▼';
+			} else {
+				content.classList.remove('expanded');
+				icon.textContent = '▲';
+			}
+		}
+		
+		function switchTab(tabName) {
+			// Update tab buttons
+			document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+			event.target.classList.add('active');
+			
+			// Update tab content
+			document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+			document.getElementById(tabName + '-tab').classList.add('active');
 		}
 		
 		function copyMermaidCode() {
 			if (currentMermaidCode) {
 				navigator.clipboard.writeText(currentMermaidCode).then(() => {
-					const btn = event.target;
-					const originalText = btn.textContent;
-					btn.textContent = '✅ Copied!';
-					setTimeout(() => {
-						btn.textContent = originalText;
-					}, 2000);
+					showTemporaryMessage(event.target, '✅ Copied!');
 				});
 			}
+		}
+		
+		function copyPrompt() {
+			const promptElement = document.getElementById('claudePrompt');
+			navigator.clipboard.writeText(promptElement.textContent).then(() => {
+				showTemporaryMessage(event.target, '✅ Copied!');
+			});
+		}
+		
+		function showTemporaryMessage(button, message) {
+			const originalText = button.textContent;
+			button.textContent = message;
+			setTimeout(() => {
+				button.textContent = originalText;
+			}, 2000);
 		}
 		
 		function downloadSVG() {
@@ -844,29 +1063,6 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				a.click();
 				URL.revokeObjectURL(url);
 			}
-		}
-		
-		function switchTab(tabName) {
-			// Update tab buttons
-			document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-			event.target.classList.add('active');
-			
-			// Update tab content
-			document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-			document.getElementById(tabName + '-tab').classList.add('active');
-		}
-		
-		function copyPrompt() {
-			const promptElement = document.getElementById('claudePrompt');
-			navigator.clipboard.writeText(promptElement.textContent).then(() => {
-				// Visual feedback
-				const btn = event.target;
-				const originalText = btn.textContent;
-				btn.textContent = '✅ Copied!';
-				setTimeout(() => {
-					btn.textContent = originalText;
-				}, 2000);
-			});
 		}
 
 		function renderStats(stats) {
@@ -916,45 +1112,34 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			switch (message.command) {
 				case 'repositoryAnalyzed':
 					currentAnalysis = message.data;
-					document.getElementById('loading').style.display = 'none';
-					document.getElementById('results').style.display = 'block';
-					document.getElementById('analyzeBtn').disabled = false;
-					document.getElementById('generateBtn').disabled = false;
+					
+					updateStatus('🎨 Generating flowchart...', 'generating');
+					updateLoadingText('🎨 Generating flowchart...', 'Creating visual representation...');
 					
 					renderStats(message.data.stats);
 					document.getElementById('structure').innerHTML = renderStructure(message.data.structure);
 					
-					// Show API status
-					const hasClaudeApi = message.data.hasClaudeApi;
-					if (hasClaudeApi) {
-						document.getElementById('generationInfo').innerHTML = '🤖 Claude 4 Sonnet API ready for enhanced generation';
-					} else {
-						document.getElementById('generationInfo').innerHTML = '🏠 Using local generation (add config.json for Claude AI)';
-					}
-					
+					// Auto-generate flowchart
+					vscode.postMessage({
+						command: 'generateFlowchart',
+						data: currentAnalysis
+					});
 					break;
 					
 				case 'flowchartGenerated':
 					currentMermaidCode = message.data.mermaidCode;
-					document.getElementById('flowchartSection').style.display = 'block';
+					
 					document.getElementById('claudePrompt').textContent = message.data.claudePrompt;
 					document.getElementById('mermaidCode').textContent = message.data.mermaidCode;
-					document.getElementById('generateBtn').disabled = false;
 					
-					// Show generation source
+					// Show generation source in status
 					const sourceIcon = message.data.source === 'claude' ? '🤖' : '🏠';
-					const sourceText = message.data.source === 'claude' ? 'Generated with Claude 4 Sonnet' : 'Generated locally';
-					document.getElementById('generationInfo').innerHTML = \`\${sourceIcon} \${sourceText}\`;
+					const sourceText = message.data.source === 'claude' ? 'Generated with Claude AI' : 'Generated locally';
+					updateStatus(\`\${sourceIcon} \${sourceText}\`, 'completed');
 					
 					renderMermaidDiagram(message.data.mermaidCode);
 					break;
 			}
-		});
-
-		// Auto-analyze on load
-		document.addEventListener('DOMContentLoaded', () => {
-			// Optional: Auto-analyze when panel opens
-			// analyzeRepository();
 		});
 	</script>
 </body>
