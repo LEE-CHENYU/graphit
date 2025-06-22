@@ -169,9 +169,15 @@ class GraphItPanel {
 		this.panel = panel;
 		this.extensionUri = extensionUri;
 		this.disposables = [];
+		this.refreshTimeout = null;
+		this.autoRefreshEnabled = true;
+		this.fileWatcher = null;
 
 		this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
 		this.panel.webview.html = this.getWebviewContent();
+		
+		// Setup file system watcher for auto-refresh
+		this.setupFileWatcher();
 		
 		this.panel.webview.onDidReceiveMessage(
 			async message => {
@@ -181,6 +187,9 @@ class GraphItPanel {
 						break;
 					case 'generateFlowchart':
 						await this.handleGenerateFlowchart(message.data);
+						break;
+					case 'toggleAutoRefresh':
+						this.toggleAutoRefresh(message.enabled);
 						break;
 				}
 			},
@@ -578,6 +587,29 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			border: 1px solid var(--border-subtle);
 		}
 		
+		.auto-refresh-toggle {
+			display: flex;
+			align-items: center;
+			gap: 6px;
+			font-size: 11px;
+			color: var(--text-secondary);
+			cursor: pointer;
+			padding: 4px 8px;
+			background: var(--surface-secondary);
+			border-radius: 4px;
+			border: 1px solid var(--border-subtle);
+			transition: all 0.2s ease;
+		}
+		
+		.auto-refresh-toggle:hover {
+			background: var(--surface-primary);
+		}
+		
+		.auto-refresh-toggle input[type="checkbox"] {
+			margin: 0;
+			accent-color: var(--primary-accent);
+		}
+		
 		.flowchart-container {
 			flex: 1;
 			display: flex;
@@ -826,6 +858,10 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 				<div class="status-indicator" id="statusIndicator">
 					<span>Initializing...</span>
 				</div>
+				<label class="auto-refresh-toggle">
+					<input type="checkbox" id="autoRefreshToggle" checked onchange="toggleAutoRefresh()">
+					<span>Auto-refresh</span>
+				</label>
 				<button class="btn btn-small" id="refreshBtn" onclick="regenerateFlowchart()">
 					Refresh
 				</button>
@@ -1209,6 +1245,23 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 			}
 		}
 
+		function toggleAutoRefresh() {
+			const checkbox = document.getElementById('autoRefreshToggle');
+			const enabled = checkbox.checked;
+			
+			vscode.postMessage({
+				command: 'toggleAutoRefresh',
+				enabled: enabled
+			});
+			
+			// Update status indicator
+			if (enabled) {
+				console.log('Auto-refresh enabled - will update when files change');
+			} else {
+				console.log('Auto-refresh disabled');
+			}
+		}
+
 		function renderStats(stats) {
 			const statsHtml = \`
 				<div class="stat-card">
@@ -1282,6 +1335,10 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 					
 					renderMermaidDiagram(message.data.mermaidCode);
 					break;
+					
+				case 'autoRefreshStarted':
+					updateStatus('Auto-refreshing from file changes...', 'analyzing');
+					break;
 			}
 		});
 	</script>
@@ -1289,8 +1346,61 @@ Return ONLY the Mermaid code, starting with 'graph TD' and including styling at 
 </html>`;
 	}
 
+	setupFileWatcher() {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		if (!workspaceFolders) return;
+
+		// Watch for file changes in the workspace
+		const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+		
+		const debouncedRefresh = () => {
+			// Only refresh if auto-refresh is enabled
+			if (!this.autoRefreshEnabled) return;
+			
+			// Clear existing timeout
+			if (this.refreshTimeout) {
+				clearTimeout(this.refreshTimeout);
+			}
+			
+			// Set new timeout - refresh after 3 seconds of inactivity
+			this.refreshTimeout = setTimeout(() => {
+				console.log('GraphIt: Auto-refreshing due to file changes...');
+				// Notify the webview that auto-refresh is happening
+				this.panel.webview.postMessage({
+					command: 'autoRefreshStarted'
+				});
+				this.handleAnalyzeRepository();
+			}, 3000);
+		};
+
+		// Listen to file creation, changes, and deletion
+		watcher.onDidCreate(debouncedRefresh);
+		watcher.onDidChange(debouncedRefresh);
+		watcher.onDidDelete(debouncedRefresh);
+
+		this.disposables.push(watcher);
+		console.log('GraphIt: File system watcher activated for auto-refresh');
+		this.fileWatcher = watcher;
+	}
+
+	toggleAutoRefresh(enabled) {
+		this.autoRefreshEnabled = enabled;
+		console.log(`GraphIt: Auto-refresh ${enabled ? 'enabled' : 'disabled'}`);
+		
+		if (!enabled && this.refreshTimeout) {
+			clearTimeout(this.refreshTimeout);
+			this.refreshTimeout = null;
+		}
+	}
+
 	dispose() {
 		GraphItPanel.currentPanel = undefined;
+		
+		// Clear any pending refresh timeout
+		if (this.refreshTimeout) {
+			clearTimeout(this.refreshTimeout);
+		}
+		
 		this.panel.dispose();
 		
 		while (this.disposables.length) {
